@@ -6,8 +6,8 @@
 #define OUTFILE_NAME	"capture.yuv"
 #define COUNT_IGNORE	1	// frame count for initilize camera
 
-#define IMAGE_WIDTH	1280
-#define IMAGE_HEIGHT	720
+#define IMAGE_WIDTH	1920
+#define IMAGE_HEIGHT	1080
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,7 +42,7 @@
           size_t                  length;
         };
 
-    char *           dev_name;
+    const char *           dev_name;
     int              fd;
     struct buffer *         buffers;
     unsigned int     n_buffers;
@@ -74,15 +74,8 @@
     
     void process_image(const void *p_buf,const int len_buf)
     {
-        FILE *fp;
-        int i;
-        char *d1,*d2,buf;
-        
-        printf("Capture size : %d\n",len_buf);
-        
         CvMat cvmat = cvMat(IMAGE_WIDTH, IMAGE_HEIGHT, CV_8UC3, (void*)p_buf);	
         img = cvDecodeImage(&cvmat, 1);
-      //  cvSaveImage("image.jpeg", img, 0);
     }
 
     int read_frame(int count)   

@@ -18,7 +18,6 @@ int sendMessageRect(const char *ipAddr, float distance, float angle) {
   char sendbuffer[BUFFERSIZE];
   struct sockaddr_in addr;
   int sd;
-  unsigned int addr_size;
   
   if ( (sd = socket(PF_INET, SOCK_DGRAM, 0)) < 0 ) {
     perror("Socket");
