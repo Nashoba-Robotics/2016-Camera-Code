@@ -14,8 +14,8 @@
 
 //#define UseUnDistort
 #define UseThresholding
-
-#define ShowWindows
+#define UseDilation
+//#define ShowWindows
 
 #ifdef UseThresholding
 #define UseContours
@@ -24,8 +24,8 @@
 #define SmartCapture
 
 //#define r640x480
-#define r1280x720
-//#define r1920x1080
+//#define r1280x720
+#define r1920x1080
 
 #ifdef r1280x720
 #define WIDTH 1280
@@ -37,6 +37,11 @@
 #define WIDTH 1920
 #define HEIGHT 1080
 #endif
+
+#define FOVH 60
+
+#define HNAUGHT = 12;
+#define WNAUGHT = 20;
 
 using namespace cv;
 using namespace std;
@@ -50,6 +55,14 @@ GetImage getimg;
 
 Mat intrinsic;
 Mat distCoeffs;
+
+static const cv::Scalar ColorWhite   = cv::Scalar( 255, 255, 255 );
+static const cv::Scalar ColorPurple  = cv::Scalar( 255, 0, 255 );
+static const cv::Scalar ColorGray    = cv::Scalar( 64, 64, 64 );
+static const cv::Scalar ColorBlue    = cv::Scalar( 255, 0, 0 );
+static const cv::Scalar ColorGreen   = cv::Scalar( 0, 255, 0 );
+static const cv::Scalar ColorRed     = cv::Scalar( 0, 0, 255 );
+static const cv::Scalar ColorYellow  = cv::Scalar( 0, 255, 255 );
 
 void setIntrinsic() {
   //Undistortion constants
@@ -114,16 +127,33 @@ void setDistCoeffs() {
 #endif
 }
 
+Mat getImage() {
+  Mat img;
+#ifdef SmartCapture
+  img = getimg.mainloop();
+#else
+  capture >> img;
+#endif
 
-Mat getBWImage() {
+#ifdef SmartCapture
+  img = getimg.mainloop();
+#else
+  capture >> img;
+#endif
+  
+  return img;
+}
+
+
+
+Mat getBWImage(Mat img) {
   clock_t t = clock();
 
+#ifdef UseDilation
   //Dilation
   const int dilationSize = 2;
   const Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
-
-  //Blur
-  const int kernelSize = 8*1+ 1;
+#endif
 
   //HLS Thresholding
   const int H_low = 60;
@@ -131,24 +161,15 @@ Mat getBWImage() {
   const int S_high = 255;
   const int S_low = 78;
   const int L_low = 50;
-  const int L_high = 255;
+  const int L_high = 200;
   const Scalar low = Scalar(H_low, L_low, S_low);
   const Scalar high = Scalar(H_high, L_high, S_high);
 
-  Mat img;
   Mat imgFixed;
   Mat imgThresh;
   Mat dilatedImg;
   GpuMat hls;
 
-#ifdef SmartCapture
-  img = getimg.mainloop();
-#else
-  capture >> img;
-#endif
-#ifdef ShowWindows
-  imshow( "image", img);
-#endif
 #ifdef UseUnDistort
   //Undistortion processing
   undistort(img, imgFixed, intrinsic, distCoeffs);
@@ -160,14 +181,19 @@ Mat getBWImage() {
   //HLS Threshold processing
   gpu::cvtColor(imgFixedGpu, hls, COLOR_BGR2HLS);
   inRange(Mat(hls), low, high, imgThresh);
-#ifdef ShowWindows
-  imshow( "thresh", imgThresh);
-#endif
 #else
   imgThresh = Mat(imgFixedGpu);
 #endif
+#ifdef UseDilation
+  dilate(imgThresh, dilatedImg, dilateElement);
+#else
+  dilatedImg = imgThresh;
+#endif
+#ifdef ShowWindows
+  imshow("dilate", dilatedImg);
+#endif
   cout << 1.0*(clock() - t)/CLOCKS_PER_SEC << " for image capture loop" << endl;
-  return imgThresh;
+  return dilatedImg;
 }
 
 int main(int argc, char* argv[])
@@ -196,94 +222,108 @@ int main(int argc, char* argv[])
   capture = VideoCapture(0);
 #endif
   //Contours
-  const int minArea = 2000;
+  const int minArea = 500;
   const int thresh = 200; //For edge detection 
   vector<vector<Point> > contours;
   vector<Vec4i> hierarchy;
-  const Scalar color = Scalar(255,255,255);
-
-  //Angle and distance detection
-  const int z = -3.25;
-  const int h_naught = 12;
-#ifdef r640x480
-  const double f = 686;
-#elif defined r1280x720
-  const double f = 1330.5;
-#elif defined r1920x1080
-  const double f = 1330.5;
-#endif
-  const int w_naught = 20;
+  const int poly_epsilon = 10;
   
-
   while(1)
   {
     clock_t t = clock();
-    GpuMat dilatedImg(getBWImage());
+    Mat img(getImage());
+    GpuMat dilatedImg(getBWImage(img));
     //Contours processing
 #ifdef UseThresholding
 #ifdef UseContours
     GpuMat canny_output;
     gpu::Canny(dilatedImg, canny_output, thresh, thresh*2, 3 );
     findContours( Mat(canny_output), contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0) );
-    //Limit contours (area, perimeter, etc.)
-    vector<vector<Point> > goodContours(0);
-    vector<vector<Point> > contours_poly(contours.size());
-    vector<Rect> boundRect(0);
-    vector<Rect> goodRect(0);
-    for(unsigned int i = 0; i < contours.size(); i++)
-    {
-      approxPolyDP(Mat(contours[i]), contours_poly[i], 3, true);
-      boundRect.push_back(boundingRect(Mat(contours_poly[i])));
-      if(boundRect[i].width * boundRect[i].height > minArea){
-        cout << "Adding one to good rect" << endl;
-        cout << "\t Width : " << boundRect[i].width << endl;
-        goodContours.push_back(contours[i]);
-        goodRect.push_back(boundRect[i]);
-      }
-    }
-    //Draw contours
-
-    Mat drawing = Mat::zeros(canny_output.size(), CV_8UC3 );
-    for(unsigned int i = 0; i < goodContours.size(); i++)
-    {
-      rectangle(drawing, goodRect[i].tl(), goodRect[i].br(), color, 2,8,0);
-      drawContours(drawing, goodContours, i, color, 2,8,hierarchy, 0, Point() );
-    }
-#ifdef ShowWindows
-    imshow("Contours", drawing);
-#endif
-    cout << "Good Rect size: " << goodRect.size() << endl; 
     
-    //Determine which contour to use.
-    if(goodRect.size() > 0)
-    {
-      unsigned int size = 0;
-      unsigned int largest = 0;
-      for(unsigned int i = 0; i < goodRect.size(); i++)
-      {
-        if(goodRect[i].width * goodRect[i].height > size) {
-          size = goodRect[i].width * goodRect[i].height;
-          largest = i;
+    /// Find the convex hull object for each contour
+    vector<vector<Point> > hull( contours.size() );
+    for(unsigned int i = 0; i < contours.size(); i++ ) {
+      convexHull( Mat(contours[i]), hull[i], false );
+    }
+  
+    // Approximate the convect hulls with pologons
+    // This reduces the number of edges and makes the contours
+    // into quads
+    vector<vector<Point> > poly( contours.size() );
+    for (unsigned int i=0; i < contours.size(); i++) {
+      approxPolyDP(hull[i], poly[i], poly_epsilon, true);
+      // These come out reversed, so reverse back
+      reverse(poly[i].begin(), poly[i].end());
+    }
+
+    // Prune the polygons into only the ones that we are intestered in.
+    vector<vector<Point> > prunedPoly(0);
+    vector<vector<Point> > prunedHulls(0);
+    vector<vector<Point> > prunedContours(0);
+    if (poly.size() > 0) {
+      int size = minArea;
+      int largest = -1;
+      for (unsigned int i=0; i < poly.size(); i++) {
+        Rect bRect = boundingRect(poly[i]);
+        // Remove polygons that are too small
+        if (bRect.width * bRect.height > minArea) {
+          prunedPoly.push_back(poly[i]);
+          prunedHulls.push_back(hull[i]);
+          prunedContours.push_back(contours[i]);
+          if(bRect.width * bRect.height > size) {
+            size = bRect.width * bRect.height;
+            largest = i;
+          }
         }
       }
+      //There are no targest bigger than the minArea
+      if(largest == -1)
+        continue;
     
-      const Rect goodRectangle = goodRect[largest];
+      vector<Point> goodPoly = prunedPoly[largest];
 
-      if(goodRectangle.width * goodRectangle.height > 0) {
-        const double alpha = 0.5*(asin(2*z*goodRectangle.height / (f*h_naught)));
-        const double d = z/sin(alpha);
-        const double turn = asin((w_naught * ((WIDTH/2) - (goodRectangle.x+goodRectangle.width/2)))/(goodRectangle.width * d));
+#ifdef ShowWindows
+      // Output the final image
+      Mat finalImage = img.clone();
+      for (unsigned int i=0; i < prunedPoly.size(); i++) {
+        drawContours(finalImage, prunedPoly, i, ColorBlue, 1, 8, vector<Vec4i>(), 0, Point() );
+      }
+      
+      imshow("Contours", finalImage);
+#endif
+      //Determine the topLeft corner x
+      const int tlcornerX = min(min(goodPoly[0].x,goodPoly[1].x),min(goodPoly[2].x,goodPoly[3].x));
+      const int tlcornerY = min(min(goodPoly[0].y,goodPoly[1].y),min(goodPoly[2].y,goodPoly[3].y));
+
+      //Determine the width and height   
+      const double x1 = (abs(goodPoly[0].x - goodPoly[1].x) + abs(goodPoly[2].x - goodPoly[3].x))/2;
+      const double x2 = (abs(goodPoly[1].x - goodPoly[2].x) + abs(goodPoly[3].x - goodPoly[0].x))/2;
+      const double width = max(x1,x2);
+
+      const double y1 = (abs(goodPoly[0].y - goodPoly[1].y) + abs(goodPoly[2].y - goodPoly[3].y))/2;
+      const double y2 = (abs(goodPoly[1].y - goodPoly[2].y) + abs(goodPoly[3].y - goodPoly[0].y))/2;
+      const double height = max(y1,y2);
+
+      const double xCenterOfTarget = width/2.0 + tlcornerX;
+      const double yCenterOfTarget = height/2.0 + tlcornerY;
+      const double leftRightPixels = xCenterOfTarget - WIDTH/2.0;
+      const double turn = (FOVH/(1.0 * WIDTH)) * leftRightPixels;
+        
+      const double distance = 0;
          
-        cout << "New image: " << endl;
-        cout << "\tAlpha: \t" << alpha << endl;
-        cout << "\td: \t" << d << endl;
-        cout << "\tpos turn means we need to turn counter clockwise" << endl;
-        cout << "\tturn: \t" << turn << endl;
-        cout << "\theight: " << goodRectangle.height << endl;
-        cout << "\twidth: \t" << goodRectangle.width << endl;
+      cout << "New image: " << endl;
+      cout << "\txCenter of target: " << xCenterOfTarget << endl;
+      cout << "\tyCenter of target: " << yCenterOfTarget << endl;
+      cout << "\tleftRightPixels: " << leftRightPixels << endl;
+      cout << "\tdistance: \t" << distance << endl;
+      cout << "\tpos turn means we need to turn clockwise" << endl;
+      cout << "\tturn: \t" << turn << endl;
+      cout << "\theight: " << height << endl;
+      cout << "\twidth: \t" << width << endl;
+      cout << "\tx: \t" << tlcornerX << endl;
+      cout << "\ty: \t" << tlcornerY << endl;
 
-        sendMessageRect("10.40.104.84", d, turn);
-      } 
+      sendMessageRect("10.17.68.21", distance, turn); 
     }
 #endif
 #endif
