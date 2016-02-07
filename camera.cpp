@@ -17,6 +17,7 @@ int main(int argc, char* argv[])
   if(!capture.isOpened())
     return -1;
   cvNamedWindow( "image", 1 );
+  cvNamedWindow( "BW Image", 2);
   Mat intrinsic = Mat(3,3,CV_32FC1);
   intrinsic.ptr<float>(0)[0] = 567.3694188707971;
   intrinsic.ptr<float>(0)[1] = 0;
@@ -43,6 +44,22 @@ int main(int argc, char* argv[])
     capture >> img;
     undistort(img, imgFixed, intrinsic, distCoeffs);    
     imshow( "image", imgFixed );
+    //HLS Threshold stuff
+    //HLS = Hue Luminance Saturation
+    int H_low = 66;
+    int H_high = 96;
+    int S_low = 99;
+    int S_high = 255;
+    int L_low = 41;
+    int L_high = 151;
+    Mat hls;
+    Scalar low = Scalar(H_low, L_low, S_low);
+    Scalar high = Scalar(H_high, L_high, S_high);
+    Mat imgThresh;
+    cvtColor(imgFixed, hls, COLOR_BGR2HLS);
+    inRange(hls, low, high, imgThresh);
+    imshow( "BW Image", imgThresh);
+    
     waitKey(1);
   }
   capture.release();
