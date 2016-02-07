@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
   Mat imgThresh;
  
   //Contours
-  int minArea = 10000;
+  int minArea = 12000;
   int minPerimeter;
   int minWidth;
   int minHeight;
@@ -62,6 +62,19 @@ int main(int argc, char* argv[])
   int maxSolidity;
   int thresh = 255; //For edge detection 
   RNG rng(12345);  
+  Mat canny_output;
+  vector<vector<Point> > contours;
+  vector<Vec4i> hierarchy;
+  Scalar color = Scalar(255,255,255);
+
+  //Dilation
+  int dilationSize = 2;
+  Mat dilatedImg;
+  Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
+
+  //Blur
+  Mat blurredImg;
+  int kernelSize = 8*1+ 1;
 
   //capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
   //capture.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
@@ -73,23 +86,13 @@ int main(int argc, char* argv[])
     undistort(img, imgFixed, intrinsic, distCoeffs);    
     imshow( "image", imgFixed );
     //Blur
-    Mat blurredImg;
-    int kernelSize = 8*1+ 1;
     GaussianBlur(imgFixed,blurredImg,Size(kernelSize,kernelSize), 1); 
     //HLS Threshold processing
     cvtColor(blurredImg, hls, COLOR_BGR2HLS);
     inRange(hls, low, high, imgThresh);
-    imshow( "BW Image", imgThresh);
     //Dilation
-    int dilationSize = 2;
-    Mat dilatedImg;
-    Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
     dilate(imgThresh, dilatedImg,dilateElement);
-    imshow( "Dilated Image", dilatedImg);
     //Contours processing
-    Mat canny_output;
-    vector<vector<Point> > contours;
-    vector<Vec4i> hierarchy;
     Canny(dilatedImg, canny_output, thresh, thresh*2, 3 );
     findContours( canny_output, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0) );
     //Limit contours (area, perimeter, etc.)
@@ -109,10 +112,8 @@ int main(int argc, char* argv[])
     
     //Draw contours
     Mat drawing = Mat::zeros(canny_output.size(), CV_8UC3 );
-    //Scalar color = Scalar(255,255,255);
     for(int i = 0; i < goodContours.size(); i++)
     {
-      Scalar color = Scalar(rng.uniform(0,255),rng.uniform(0,255),rng.uniform(0,255));
       rectangle(drawing, goodRect[i].tl(), goodRect[i].br(), color, 2,8,0);
       drawContours(drawing, goodContours, i, color, 2,8,hierarchy, 0, Point() );
     }
