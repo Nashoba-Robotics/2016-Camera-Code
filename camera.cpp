@@ -6,7 +6,7 @@
 #include <opencv2/videoio.hpp>
 #include "opencv2/videoio/videoio_c.h"
 #include "opencv2/highgui/highgui_c.h"
-#include <stdio.h>
+#include <math.h>
 //g++ -ggdb `pkg-config opencv --cflags --libs` camera.cpp -o camera `pkg-config --libs opencv`
 
 using namespace cv;
@@ -48,7 +48,6 @@ int main(int argc, char* argv[])
   const Scalar low = Scalar(H_low, L_low, S_low);
   const Scalar high = Scalar(H_high, L_high, S_high);
   Mat imgThresh;
- 
   //Contours
   const int minArea = 500;
   int minPerimeter;
@@ -75,8 +74,11 @@ int main(int argc, char* argv[])
 
   //Angle and distance detection
   const double pi = 3.14159265;
+  const int z = 89;
+  const int h_naught = 12;
+  const double f = 100000;
+  const int w_naught = 20;
   
-
   //capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
   //capture.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
   Mat img;
@@ -119,6 +121,26 @@ int main(int argc, char* argv[])
       drawContours(drawing, goodContours, i, color, 2,8,hierarchy, 0, Point() );
     }
     imshow("Contours", drawing);
+
+        //Determine which contour to use.
+    //We'll assume there's only one contour for now, but this needs to be fixed.
+    for(int i = 0; i < goodContours.size(); i++)
+    {
+      if(goodRect.size() > 0) {
+        const double alpha = 0.5*(asin(2*z*goodRect[i].height / (f*h_naught)));
+        const double d = z/sin(alpha);
+        const double beta = acos(d * goodRect[i].width / (f * w_naught));
+        const double beta_h = asin(sin(beta) / cos(alpha));
+         
+        cout << "New image" << endl;
+        cout << "Alpha: \t" << alpha << endl;
+        cout << "d: \t" << d << endl;
+        cout << "beta: \t" << beta << endl;
+        cout << "beta_h: " << beta_h << endl;
+        cout << "height: " << goodRect[i].height << endl;
+        cout << "width: \t" << goodRect[i].width << endl;
+      }
+    }
     waitKey(1);
   }
   capture.release();
