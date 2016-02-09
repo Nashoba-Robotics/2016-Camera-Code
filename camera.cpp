@@ -17,8 +17,6 @@ int main(int argc, char* argv[])
   VideoCapture capture = VideoCapture(0);  
   if(!capture.isOpened())
     return -1;
-  cvNamedWindow( "image", 1 );
-  cvNamedWindow( "BW Image", 2);
   //Undistortion constants
   Mat intrinsic = Mat(3,3,CV_32FC1);
   intrinsic.ptr<float>(0)[0] = 567.3694188707971;
@@ -40,19 +38,19 @@ int main(int argc, char* argv[])
 
   //HLS Threshold
   //HLS = Hue Luminance Saturation
-  int H_low = 0;
-  int H_high = 29;
-  int S_low = 0;
-  int S_high = 47;
-  int L_low = 218;
-  int L_high = 255;
+  const int H_low = 73;
+  const int H_high = 116;
+  const int S_low = 197;
+  const int S_high = 255;
+  const int L_low = 154;
+  const int L_high = 255;
   Mat hls;
-  Scalar low = Scalar(H_low, L_low, S_low);
-  Scalar high = Scalar(H_high, L_high, S_high);
+  const Scalar low = Scalar(H_low, L_low, S_low);
+  const Scalar high = Scalar(H_high, L_high, S_high);
   Mat imgThresh;
  
   //Contours
-  int minArea = 12000;
+  const int minArea = 500;
   int minPerimeter;
   int minWidth;
   int minHeight;
@@ -60,21 +58,24 @@ int main(int argc, char* argv[])
   int maxHeight;
   int minSolidity;
   int maxSolidity;
-  int thresh = 255; //For edge detection 
-  RNG rng(12345);  
+  const int thresh = 255; //For edge detection 
   Mat canny_output;
   vector<vector<Point> > contours;
   vector<Vec4i> hierarchy;
-  Scalar color = Scalar(255,255,255);
+  const Scalar color = Scalar(255,255,255);
 
   //Dilation
-  int dilationSize = 2;
+  const int dilationSize = 2;
   Mat dilatedImg;
-  Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
+  const Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
 
   //Blur
   Mat blurredImg;
-  int kernelSize = 8*1+ 1;
+  const int kernelSize = 8*1+ 1;
+
+  //Angle and distance detection
+  const double pi = 3.14159265;
+  
 
   //capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
   //capture.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
