@@ -1,17 +1,14 @@
 #include <cv.hpp>
 #include <highgui.h>
 #include <iostream>
-#include <opencv2/imgproc.hpp>
+#include "opencv2/imgproc.hpp"
 #include <opencv2/highgui.hpp>
-#include <opencv2/videoio.hpp>
-#include "opencv2/videoio/videoio_c.h"
 #include "opencv2/highgui/highgui_c.h"
 #include <math.h>
-#include "opencv2/core/cuda.hpp"
+#include <math.h>
 //g++ -ggdb `pkg-config opencv --cflags --libs` camera.cpp -o camera `pkg-config --libs opencv`
 
 using namespace cv;
-using namespace cuda;
 using namespace std;
 
 Mat getBWImage(VideoCapture cap, Mat intrinsic, Mat distCoeffs) {
@@ -80,20 +77,12 @@ Mat getDistCoeffs() {
 
 int main(int argc, char* argv[])
 {
-  if(getCudaEnabledDeviceCount() == 0) {
-    cout << "No graphics device found" << endl; 
-    return -1;
-  }
-
+  cout << CV_MAJOR_VERSION << endl;
   VideoCapture capture = VideoCapture(0);  
   if(!capture.isOpened()) {
     cout << "Video Capture not opened" << endl;
     return -1;
-  }
-  
-  //Graphics
-  setDevice(0);
-  
+  } 
   
   //Contours
   const int minArea = 500;
