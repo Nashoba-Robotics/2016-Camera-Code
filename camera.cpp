@@ -7,9 +7,11 @@
 #include "opencv2/videoio/videoio_c.h"
 #include "opencv2/highgui/highgui_c.h"
 #include <math.h>
+#include "opencv2/core/cuda.hpp"
 //g++ -ggdb `pkg-config opencv --cflags --libs` camera.cpp -o camera `pkg-config --libs opencv`
 
 using namespace cv;
+using namespace cuda;
 using namespace std;
 
 Mat getBWImage(VideoCapture cap, Mat intrinsic, Mat distCoeffs) {
@@ -21,11 +23,11 @@ Mat getBWImage(VideoCapture cap, Mat intrinsic, Mat distCoeffs) {
   const int kernelSize = 8*1+ 1;
 
   //HLS Thresholding
-  const int H_low = 73;
-  const int H_high = 116;
-  const int S_low = 197;
+  const int H_low = 60;
+  const int H_high = 180;
+  const int S_low = 78;
   const int S_high = 255;
-  const int L_low = 154;
+  const int L_low = 100;
   const int L_high = 255;
   const Scalar low = Scalar(H_low, L_low, S_low);
   const Scalar high = Scalar(H_high, L_high, S_high);
@@ -47,6 +49,7 @@ Mat getBWImage(VideoCapture cap, Mat intrinsic, Mat distCoeffs) {
   inRange(hls, low, high, imgThresh);
   //Dilation
   dilate(imgThresh, dilatedImg,dilateElement);
+  imshow("dilate", dilatedImg);
   return dilatedImg;
 }
 
@@ -77,9 +80,20 @@ Mat getDistCoeffs() {
 
 int main(int argc, char* argv[])
 {
-  VideoCapture capture = VideoCapture(0);  
-  if(!capture.isOpened())
+  if(getCudaEnabledDeviceCount() == 0) {
+    cout << "No graphics device found" << endl; 
     return -1;
+  }
+
+  VideoCapture capture = VideoCapture(0);  
+  if(!capture.isOpened()) {
+    cout << "Video Capture not opened" << endl;
+    return -1;
+  }
+  
+  //Graphics
+  setDevice(0);
+  
   
   //Contours
   const int minArea = 500;
@@ -98,9 +112,9 @@ int main(int argc, char* argv[])
 
   //Angle and distance detection
   const double pi = 3.14159265;
-  const int z = 89;
+  const int z = 6;
   const int h_naught = 12;
-  const double f = 10000;
+  const double f = 613;
   const int w_naught = 20;
   
   //capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
@@ -114,20 +128,21 @@ int main(int argc, char* argv[])
     Canny(dilatedImg, canny_output, thresh, thresh*2, 3 );
     findContours( canny_output, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0) );
     //Limit contours (area, perimeter, etc.)
-    vector<vector<Point> > goodContours(contours.size());
+    vector<vector<Point> > goodContours(0);
     vector<vector<Point> > contours_poly(contours.size());
-    vector<Rect> boundRect(contours.size());
-    vector<Rect> goodRect(contours.size());
+    vector<Rect> boundRect(0);
+    vector<Rect> goodRect(0);
     for(int i = 0; i < contours.size(); i++)
     {
       approxPolyDP(Mat(contours[i]), contours_poly[i], 3, true);
-      boundRect[i] = boundingRect(Mat(contours_poly[i]));
+      boundRect.push_back(boundingRect(Mat(contours_poly[i])));
       if(boundRect[i].width * boundRect[i].height > minArea){
+        cout << "Adding one to good rect" << endl;
+        cout << "\t Width : " << boundRect[i].width << endl;
         goodContours.push_back(contours[i]);
         goodRect.push_back(boundRect[i]);
       }
     }
-    
     //Draw contours
     Mat drawing = Mat::zeros(canny_output.size(), CV_8UC3 );
     for(int i = 0; i < goodContours.size(); i++)
@@ -136,10 +151,10 @@ int main(int argc, char* argv[])
       drawContours(drawing, goodContours, i, color, 2,8,hierarchy, 0, Point() );
     }
     imshow("Contours", drawing);
-
+    cout << "Good Rect size: " << goodRect.size() << endl; 
     //Determine which contour to use.
     //We'll assume there's only one contour for now, but this needs to be fixed.
-    for(int i = 0; i < goodContours.size(); i++)
+    for(int i = 0; i < goodRect.size(); i++)
     {
       if(goodRect.size() > 0) {
         const double alpha = 0.5*(asin(2*z*goodRect[i].height / (f*h_naught)));
@@ -147,7 +162,7 @@ int main(int argc, char* argv[])
         const double beta = acos(d * goodRect[i].width / (f * w_naught));
         const double beta_h = asin(sin(beta) / cos(alpha));
          
-        cout << "New image" << endl;
+        cout << "New image: " << i << endl;
         cout << "Alpha: \t" << alpha << endl;
         cout << "d: \t" << d << endl;
         cout << "beta: \t" << beta << endl;
