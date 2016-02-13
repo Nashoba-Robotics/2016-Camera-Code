@@ -7,7 +7,22 @@
 #include <math.h>
 #include "GetImage.h"
 
-//#define ShowWindows
+#define ShowWindows
+
+//#define r640x480
+#define r1280x720
+//#define r1920x1080
+
+#ifdef r1280x1720
+#define WIDTH 1280
+#define HEIGHT 720
+#elif defined(r640x480)
+#define WIDTH 640
+#define HEIGHT 480
+#elif defined(r1920x1080)
+#define WIDTH 1920
+#define HEIGHT 1080
+#endif
 
 //g++ -ggdb `pkg-config opencv --cflags --libs` camera.cpp -o camera `pkg-config --libs opencv`
 
@@ -64,6 +79,7 @@ Mat getBWImage( Mat intrinsic, Mat distCoeffs) {
 Mat getIntrinsic() {
   //Undistortion constants
   Mat intrinsic = Mat(3,3,CV_32FC1);
+#ifdef r640x480
   intrinsic.ptr<float>(0)[0] = 567.3694188707971;
   intrinsic.ptr<float>(0)[1] = 0;
   intrinsic.ptr<float>(0)[2] = 334.050726216;
@@ -73,16 +89,39 @@ Mat getIntrinsic() {
   intrinsic.ptr<float>(2)[0] = 0;
   intrinsic.ptr<float>(2)[1] = 0;
   intrinsic.ptr<float>(2)[2] = 1;
+#elif defined(r1280x720)
+  //These should be done again
+  intrinsic.ptr<float>(0)[0] = 849.256399173029;
+  intrinsic.ptr<float>(0)[1] = 0;
+  intrinsic.ptr<float>(0)[2] = 655.2627383935369;
+  intrinsic.ptr<float>(1)[0] = 0;
+  intrinsic.ptr<float>(1)[1] = 850.2670498542308;
+  intrinsic.ptr<float>(1)[2] = 361.233269254571;
+  intrinsic.ptr<float>(2)[0] = 0;
+  intrinsic.ptr<float>(2)[1] = 0;
+  intrinsic.ptr<float>(2)[2] = 1;
+#endif
+
   return intrinsic;
 }
 
 Mat getDistCoeffs() {
   Mat distCoeffs = Mat(1,5,CV_32FC1);
+#ifdef r640x480
   distCoeffs.ptr<float>(0)[0] = -0.463731090351821;
   distCoeffs.ptr<float>(0)[1] = 0.5114874359918231;
   distCoeffs.ptr<float>(0)[2] = -0.003444501644466447;
   distCoeffs.ptr<float>(0)[3] = 0.0005056629007096351;
   distCoeffs.ptr<float>(0)[4] = -0.6914960232636986;
+#elif defined(r1280x720)
+  //These should be done again
+  distCoeffs.ptr<float>(0)[0] = -0.1019179702473763;
+  distCoeffs.ptr<float>(0)[1] = -0.09943304239604193;
+  distCoeffs.ptr<float>(0)[2] = 0.003811821061129521;
+  distCoeffs.ptr<float>(0)[3] = 0.002936280291171185;
+  distCoeffs.ptr<float>(0)[4] = 0.1175824546873729;
+#endif
+
   return distCoeffs;
 }
 
@@ -130,7 +169,7 @@ int main(int argc, char* argv[])
     vector<vector<Point> > contours_poly(contours.size());
     vector<Rect> boundRect(0);
     vector<Rect> goodRect(0);
-    for(int i = 0; i < contours.size(); i++)
+    for(unsigned int i = 0; i < contours.size(); i++)
     {
       approxPolyDP(Mat(contours[i]), contours_poly[i], 3, true);
       boundRect.push_back(boundingRect(Mat(contours_poly[i])));
@@ -143,7 +182,7 @@ int main(int argc, char* argv[])
     }
     //Draw contours
     Mat drawing = Mat::zeros(canny_output.size(), CV_8UC3 );
-    for(int i = 0; i < goodContours.size(); i++)
+    for(unsigned int i = 0; i < goodContours.size(); i++)
     {
       rectangle(drawing, goodRect[i].tl(), goodRect[i].br(), color, 2,8,0);
       drawContours(drawing, goodContours, i, color, 2,8,hierarchy, 0, Point() );
@@ -154,7 +193,7 @@ int main(int argc, char* argv[])
     cout << "Good Rect size: " << goodRect.size() << endl; 
     //Determine which contour to use.
     //We'll assume there's only one contour for now, but this needs to be fixed.
-    for(int i = 0; i < goodRect.size(); i++)
+    for(unsigned int i = 0; i < goodRect.size(); i++)
     {
       if(goodRect.size() > 0) {
         const double alpha = 0.5*(asin(2*z*goodRect[i].height / (f*h_naught)));

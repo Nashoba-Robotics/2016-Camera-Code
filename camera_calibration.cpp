@@ -1,6 +1,7 @@
 #include <cv.hpp>
 #include <highgui.h>
 #include <iostream>
+#include "GetImage.h"
 
 using namespace cv;
 using namespace std;
@@ -23,9 +24,15 @@ int main()
   int numSquares = numCornersHor * numCornersVer;
   Size board_sz = Size(numCornersHor, numCornersVer);
 
-  VideoCapture capture = VideoCapture(0);
-  //capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-  //capture.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
+
+  
+  GetImage getimg = GetImage();
+  getimg.open_device();
+  getimg.init_device();
+  getimg.start_capturing();
+
+	
+  //VideoCapture capture = VideoCapture(0);
   vector<vector<Point3f> > object_points;
   vector<vector<Point2f> > image_points;
 
@@ -35,8 +42,8 @@ int main()
   Mat image;
   Mat gray_image;
 
-  capture >> image;
-
+//  capture >> image;
+  image = getimg.mainloop();
   vector<Point3f> obj;
   for(int j=0; j < numSquares; j++)
     obj.push_back(Point3f(j/numCornersHor, j%numCornersHor, 0.0f));
@@ -54,7 +61,9 @@ int main()
     imshow("win1", image);
     imshow("win2", gray_image);
 
-    capture >> image;
+
+    image = getimg.mainloop();
+    //capture >> image;
     int key = waitKey(1);
     if(key == 27)
       return 0;
@@ -86,13 +95,17 @@ int main()
   Mat imageUndistorted;
   while(1)
   {
-    capture >> image;
+    image = getimg.mainloop();
+    //capture >> image;
     undistort(image, imageUndistorted, intrinsic, distCoeffs);
     imshow("win1", image);
     imshow("win2", imageUndistorted);
     waitKey(1);
   }
-  capture.release();
+//  capture.release();
+  getimg.stop_capturing();
+  getimg.uninit_device();
+  getimg.close_device();
 
   return 0;
 }
