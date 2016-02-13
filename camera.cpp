@@ -4,13 +4,14 @@
 #include "opencv2/imgproc.hpp"
 #include <opencv2/highgui.hpp>
 #include "opencv2/highgui/highgui_c.h"
+#include <opencv2/gpu/gpu.hpp>
 #include <math.h>
 #include "GetImage.h"
 
 #define ShowWindows
 
-//#define r640x480
-#define r1280x720
+#define r640x480
+//#define r1280x720
 //#define r1920x1080
 
 #ifdef r1280x1720
@@ -28,53 +29,9 @@
 
 using namespace cv;
 using namespace std;
+using namespace gpu;
 
 GetImage getimg;
-
-Mat getBWImage( Mat intrinsic, Mat distCoeffs) {
-  //Dilation
-  const int dilationSize = 2;
-  const Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
-
-  //Blur
-  const int kernelSize = 8*1+ 1;
-
-  //HLS Thresholding
-  const int H_low = 60;
-  const int H_high = 180;
-  const int S_high = 255;
-  const int S_low = 78;
-  const int L_low = 100;
-  const int L_high = 255;
-  const Scalar low = Scalar(H_low, L_low, S_low);
-  const Scalar high = Scalar(H_high, L_high, S_high);
-
-  Mat img;
-  Mat imgFixed;
-  Mat blurredImg;
-  Mat imgThresh;
-  Mat dilatedImg;
-  Mat hls;
-  
-	//cap >> img;
-  img = getimg.mainloop();
-  //Undistortion processing
-  undistort(img, imgFixed, intrinsic, distCoeffs);
-#ifdef ShowWindows
-  imshow( "image", imgFixed );
-#endif
-  //Blur
-  GaussianBlur(imgFixed,blurredImg,Size(kernelSize,kernelSize), 1);
-  //HLS Threshold processing
-  cvtColor(blurredImg, hls, COLOR_BGR2HLS);
-  inRange(hls, low, high, imgThresh);
-  //Dilation
-  dilate(imgThresh, dilatedImg,dilateElement); 
-#ifdef ShowWindows
-  imshow("dilate", dilatedImg);
-#endif 
- return dilatedImg;
-}
 
 Mat getIntrinsic() {
   //Undistortion constants
@@ -125,16 +82,65 @@ Mat getDistCoeffs() {
   return distCoeffs;
 }
 
+
+GpuMat getBWImage() {
+  //Dilation
+  const int dilationSize = 2;
+  const Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
+
+  //Blur
+  const int kernelSize = 8*1+ 1;
+
+  //HLS Thresholding
+  const int H_low = 60;
+  const int H_high = 180;
+  const int S_high = 255;
+  const int S_low = 78;
+  const int L_low = 100;
+  const int L_high = 255;
+  const Scalar low = Scalar(H_low, L_low, S_low);
+  const Scalar high = Scalar(H_high, L_high, S_high);
+
+  Mat img;
+  Mat imgFixed;
+  GpuMat blurredImg;
+  Mat imgThresh;
+  Mat dilatedImg;
+  GpuMat hls;
+
+  img = getimg.mainloop();
+  //Undistortion processing
+  undistort(img, imgFixed, getIntrinsic(), getDistCoeffs());
+  GpuMat imgFixedGpu(imgFixed);
+#ifdef ShowWindows
+  imshow( "image", imgFixed );
+#endif
+  //Blur
+  gpu::GaussianBlur(imgFixedGpu,blurredImg,Size(kernelSize,kernelSize), 1);
+  //HLS Threshold processing
+  gpu::cvtColor(blurredImg, hls, COLOR_BGR2HLS);
+  inRange(Mat(hls), low, high, imgThresh);
+  //Dilation
+  dilate(imgThresh, dilatedImg,dilateElement); 
+#ifdef ShowWindows
+  imshow("dilate", dilatedImg);
+#endif 
+  return GpuMat(dilatedImg);
+}
+
 int main(int argc, char* argv[])
 {
   cout << "Using OpenCV Version " << CV_MAJOR_VERSION << "." << CV_MINOR_VERSION << endl;
-/* 
- VideoCapture capture = VideoCapture(0);  
-  if(!capture.isOpened()) {
-    cout << "Video Capture not opened" << endl;
-    return -1;
-  } 
- */
+
+  int numGPU = getCudaEnabledDeviceCount();
+  cout << "Number of GPU Devices: " << numGPU << endl;
+  
+  if(numGPU == 0) {
+    cout << "Need to have a GPU Device" << endl;
+    return 1;
+  }
+  
+  setDevice(0);
 
   getimg = GetImage();
   getimg.open_device();
@@ -144,7 +150,6 @@ int main(int argc, char* argv[])
   //Contours
   const int minArea = 2000;
   const int thresh = 200; //For edge detection 
-  Mat canny_output;
   vector<vector<Point> > contours;
   vector<Vec4i> hierarchy;
   const Scalar color = Scalar(255,255,255);
@@ -159,11 +164,11 @@ int main(int argc, char* argv[])
   while(1)
   {
     clock_t t = clock();
-    Mat dilatedImg;
-    dilatedImg = getBWImage( getIntrinsic(), getDistCoeffs());
+    GpuMat dilatedImg = getBWImage();
     //Contours processing
-    Canny(dilatedImg, canny_output, thresh, thresh*2, 3 );
-    findContours( canny_output, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0) );
+    GpuMat canny_output;
+    gpu::Canny(dilatedImg, canny_output, thresh, thresh*2, 3 );
+    findContours( Mat(canny_output), contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0) );
     //Limit contours (area, perimeter, etc.)
     vector<vector<Point> > goodContours(0);
     vector<vector<Point> > contours_poly(contours.size());
