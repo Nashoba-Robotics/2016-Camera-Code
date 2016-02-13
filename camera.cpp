@@ -10,6 +10,8 @@
 
 #define ShowWindows
 
+//#define SmartCapture
+
 #define r640x480
 //#define r1280x720
 //#define r1920x1080
@@ -31,11 +33,19 @@ using namespace cv;
 using namespace std;
 using namespace gpu;
 
+#ifndef SmartCapture
+VideoCapture capture;
+#endif
+#ifdef SmartCapture
 GetImage getimg;
+#endif
 
-Mat getIntrinsic() {
+Mat intrinsic;
+Mat distCoeffs;
+
+void setIntrinsic() {
   //Undistortion constants
-  Mat intrinsic = Mat(3,3,CV_32FC1);
+  intrinsic = Mat(3,3,CV_32FC1);
 #ifdef r640x480
   intrinsic.ptr<float>(0)[0] = 567.3694188707971;
   intrinsic.ptr<float>(0)[1] = 0;
@@ -58,12 +68,10 @@ Mat getIntrinsic() {
   intrinsic.ptr<float>(2)[1] = 0;
   intrinsic.ptr<float>(2)[2] = 1;
 #endif
-
-  return intrinsic;
 }
 
-Mat getDistCoeffs() {
-  Mat distCoeffs = Mat(1,5,CV_32FC1);
+void setDistCoeffs() {
+  distCoeffs = Mat(1,5,CV_32FC1);
 #ifdef r640x480
   distCoeffs.ptr<float>(0)[0] = -0.463731090351821;
   distCoeffs.ptr<float>(0)[1] = 0.5114874359918231;
@@ -78,8 +86,6 @@ Mat getDistCoeffs() {
   distCoeffs.ptr<float>(0)[3] = 0.002936280291171185;
   distCoeffs.ptr<float>(0)[4] = 0.1175824546873729;
 #endif
-
-  return distCoeffs;
 }
 
 
@@ -108,9 +114,14 @@ GpuMat getBWImage() {
   Mat dilatedImg;
   GpuMat hls;
 
+#ifdef SmartCapture
   img = getimg.mainloop();
+#endif  
+#ifndef SmartCapture
+  capture >> img;
+#endif
   //Undistortion processing
-  undistort(img, imgFixed, getIntrinsic(), getDistCoeffs());
+  undistort(img, imgFixed, intrinsic, distCoeffs);
   GpuMat imgFixedGpu(imgFixed);
 #ifdef ShowWindows
   imshow( "image", imgFixed );
@@ -142,11 +153,18 @@ int main(int argc, char* argv[])
   
   setDevice(0);
 
+  setDistCoeffs();
+  setIntrinsic();
+
+#ifdef SmartCapture
   getimg = GetImage();
   getimg.open_device();
   getimg.init_device();
   getimg.start_capturing();
- 
+#endif
+#ifndef SmartCapture
+  capture = VideoCapture(0);
+#endif
   //Contours
   const int minArea = 2000;
   const int thresh = 200; //For edge detection 
@@ -218,9 +236,13 @@ int main(int argc, char* argv[])
     cout << CLOCKS_PER_SEC/(clock() - t) << "fps" << endl;
     waitKey(1);
   }
-  //capture.release();
+#ifndef SmartCapture
+  capture.release();
+#endif
+#ifdef SmartCapture
   getimg.stop_capturing();
   getimg.uninit_device();
   getimg.close_device();
+#endif  
   return 0;
 }
