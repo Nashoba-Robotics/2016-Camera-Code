@@ -5,13 +5,18 @@
 #include <opencv2/highgui.hpp>
 #include "opencv2/highgui/highgui_c.h"
 #include <math.h>
-#include <math.h>
+#include "GetImage.h"
+
+//#define ShowWindows
+
 //g++ -ggdb `pkg-config opencv --cflags --libs` camera.cpp -o camera `pkg-config --libs opencv`
 
 using namespace cv;
 using namespace std;
 
-Mat getBWImage(VideoCapture cap, Mat intrinsic, Mat distCoeffs) {
+GetImage getimg;
+
+Mat getBWImage( Mat intrinsic, Mat distCoeffs) {
   //Dilation
   const int dilationSize = 2;
   const Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
@@ -22,8 +27,8 @@ Mat getBWImage(VideoCapture cap, Mat intrinsic, Mat distCoeffs) {
   //HLS Thresholding
   const int H_low = 60;
   const int H_high = 180;
-  const int S_low = 78;
   const int S_high = 255;
+  const int S_low = 78;
   const int L_low = 100;
   const int L_high = 255;
   const Scalar low = Scalar(H_low, L_low, S_low);
@@ -35,19 +40,25 @@ Mat getBWImage(VideoCapture cap, Mat intrinsic, Mat distCoeffs) {
   Mat imgThresh;
   Mat dilatedImg;
   Mat hls;
-  cap >> img;
+  
+	//cap >> img;
+  img = getimg.mainloop();
   //Undistortion processing
   undistort(img, imgFixed, intrinsic, distCoeffs);
+#ifdef ShowWindows
   imshow( "image", imgFixed );
+#endif
   //Blur
   GaussianBlur(imgFixed,blurredImg,Size(kernelSize,kernelSize), 1);
   //HLS Threshold processing
   cvtColor(blurredImg, hls, COLOR_BGR2HLS);
   inRange(hls, low, high, imgThresh);
   //Dilation
-  dilate(imgThresh, dilatedImg,dilateElement);
+  dilate(imgThresh, dilatedImg,dilateElement); 
+#ifdef ShowWindows
   imshow("dilate", dilatedImg);
-  return dilatedImg;
+#endif 
+ return dilatedImg;
 }
 
 Mat getIntrinsic() {
@@ -78,12 +89,19 @@ Mat getDistCoeffs() {
 int main(int argc, char* argv[])
 {
   cout << "Using OpenCV Version " << CV_MAJOR_VERSION << "." << CV_MINOR_VERSION << endl;
-  VideoCapture capture = VideoCapture(0);  
+/* 
+ VideoCapture capture = VideoCapture(0);  
   if(!capture.isOpened()) {
     cout << "Video Capture not opened" << endl;
     return -1;
   } 
-  
+ */
+
+  getimg = GetImage();
+  getimg.open_device();
+  getimg.init_device();
+  getimg.start_capturing();
+ 
   //Contours
   const int minArea = 2000;
   const int thresh = 200; //For edge detection 
@@ -98,14 +116,12 @@ int main(int argc, char* argv[])
   const double f = 686;
   const int w_naught = 20;
   
-  //capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
-  //capture.set(CV_CAP_PROP_FRAME_HEIGHT, 1080);
 
   while(1)
   {
     clock_t t = clock();
     Mat dilatedImg;
-    dilatedImg = getBWImage(capture, getIntrinsic(), getDistCoeffs());
+    dilatedImg = getBWImage( getIntrinsic(), getDistCoeffs());
     //Contours processing
     Canny(dilatedImg, canny_output, thresh, thresh*2, 3 );
     findContours( canny_output, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0) );
@@ -132,7 +148,9 @@ int main(int argc, char* argv[])
       rectangle(drawing, goodRect[i].tl(), goodRect[i].br(), color, 2,8,0);
       drawContours(drawing, goodContours, i, color, 2,8,hierarchy, 0, Point() );
     }
+#ifdef ShowWindows
     imshow("Contours", drawing);
+#endif
     cout << "Good Rect size: " << goodRect.size() << endl; 
     //Determine which contour to use.
     //We'll assume there's only one contour for now, but this needs to be fixed.
@@ -156,6 +174,9 @@ int main(int argc, char* argv[])
     cout << CLOCKS_PER_SEC/(clock() - t) << "fps" << endl;
     waitKey(1);
   }
-  capture.release();
+  //capture.release();
+  getimg.stop_capturing();
+  getimg.uninit_device();
+  getimg.close_device();
   return 0;
 }
