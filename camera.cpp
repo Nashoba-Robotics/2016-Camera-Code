@@ -77,7 +77,7 @@ Mat getDistCoeffs() {
 
 int main(int argc, char* argv[])
 {
-  cout << "Using OpenCV Version " << CV_MAJOR_VERSION << "." << CV_MINOR_VERSION << endl;
+  cout << CV_MAJOR_VERSION << endl;
   VideoCapture capture = VideoCapture(0);  
   if(!capture.isOpened()) {
     cout << "Video Capture not opened" << endl;
@@ -85,17 +85,25 @@ int main(int argc, char* argv[])
   } 
   
   //Contours
-  const int minArea = 2000;
-  const int thresh = 200; //For edge detection 
+  const int minArea = 500;
+  int minPerimeter;
+  int minWidth;
+  int minHeight;
+  int maxWidth;
+  int maxHeight;
+  int minSolidity;
+  int maxSolidity;
+  const int thresh = 255; //For edge detection 
   Mat canny_output;
   vector<vector<Point> > contours;
   vector<Vec4i> hierarchy;
   const Scalar color = Scalar(255,255,255);
 
   //Angle and distance detection
-  const int z = 4;
+  const double pi = 3.14159265;
+  const int z = 6;
   const int h_naught = 12;
-  const double f = 686;
+  const double f = 613;
   const int w_naught = 20;
   
   //capture.set(CV_CAP_PROP_FRAME_WIDTH, 1920);
@@ -103,7 +111,6 @@ int main(int argc, char* argv[])
 
   while(1)
   {
-    clock_t t = clock();
     Mat dilatedImg;
     dilatedImg = getBWImage(capture, getIntrinsic(), getDistCoeffs());
     //Contours processing
@@ -153,7 +160,6 @@ int main(int argc, char* argv[])
         cout << "width: \t" << goodRect[i].width << endl;
       }
     }
-    cout << CLOCKS_PER_SEC/(clock() - t) << "fps" << endl;
     waitKey(1);
   }
   capture.release();
