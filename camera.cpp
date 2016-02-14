@@ -5,16 +5,20 @@
 #include <opencv2/highgui.hpp>
 #include "opencv2/highgui/highgui_c.h"
 #include <opencv2/gpu/gpu.hpp>
-#include <math.h>
+#include <cmath>
 #include "GetImage.h"
+#include "network.h"
+
+// Network buffer size
+#define BUFFER 1024
 
 #define ShowWindows
 
-#define SmartCapture
+//#define SmartCapture
 
-//#define r640x480
+#define r640x480
 //#define r1280x720
-#define r1920x1080
+//#define r1920x1080
 
 #ifdef r1280x1720
 #define WIDTH 1280
@@ -26,8 +30,6 @@
 #define WIDTH 1920
 #define HEIGHT 1080
 #endif
-
-//g++ -ggdb `pkg-config opencv --cflags --libs` camera.cpp -o camera `pkg-config --libs opencv`
 
 using namespace cv;
 using namespace std;
@@ -140,7 +142,7 @@ GpuMat getBWImage() {
   undistort(img, imgFixed, intrinsic, distCoeffs);
   GpuMat imgFixedGpu(imgFixed);
 #ifdef ShowWindows
-//  imshow( "image", imgFixed );
+  imshow( "image", imgFixed );
 #endif
   //Blur
   gpu::GaussianBlur(imgFixedGpu,blurredImg,Size(kernelSize,kernelSize), 1);
@@ -225,6 +227,7 @@ int main(int argc, char* argv[])
       }
     }
     //Draw contours
+
     Mat drawing = Mat::zeros(canny_output.size(), CV_8UC3 );
     for(unsigned int i = 0; i < goodContours.size(); i++)
     {
@@ -235,23 +238,37 @@ int main(int argc, char* argv[])
     imshow("Contours", drawing);
 #endif
     cout << "Good Rect size: " << goodRect.size() << endl; 
+    
     //Determine which contour to use.
-    //We'll assume there's only one contour for now, but this needs to be fixed.
-    for(unsigned int i = 0; i < goodRect.size(); i++)
+    if(goodRect.size() > 0)
     {
-      if(goodRect.size() > 0) {
-        const double alpha = 0.5*(asin(2*z*goodRect[i].height / (f*h_naught)));
+      unsigned int size = 0;
+      unsigned int largest = 0;
+      for(unsigned int i = 0; i < goodRect.size(); i++)
+      {
+        if(goodRect[i].width * goodRect[i].height > size) {
+          size = goodRect[i].width * goodRect[i].height;
+          largest = i;
+        }
+      }
+    
+      const Rect goodRectangle = goodRect[largest];
+
+      if(goodRectangle.width * goodRectangle.height > 0) {
+        const double alpha = 0.5*(asin(2*z*goodRectangle.height / (f*h_naught)));
         const double d = z/sin(alpha);
-        const double turn = asin((w_naught * ((WIDTH/2) - goodRect[i].x))/(goodRect[i].width * d));
+        const double turn = asin((w_naught * ((WIDTH/2) - (goodRectangle.x+goodRectangle.width/2)))/(goodRectangle.width * d));
          
-        cout << "New image: " << i << endl;
+        cout << "New image: " << endl;
         cout << "\tAlpha: \t" << alpha << endl;
         cout << "\td: \t" << d << endl;
         cout << "\tpos turn means we need to turn counter clockwise" << endl;
         cout << "\tturn: \t" << turn << endl;
-        cout << "\theight: " << goodRect[i].height << endl;
-        cout << "\twidth: \t" << goodRect[i].width << endl;
-      }
+        cout << "\theight: " << goodRectangle.height << endl;
+        cout << "\twidth: \t" << goodRectangle.width << endl;
+
+        sendMessageRect("10.40.104.84", d, turn);
+      } 
     }
     cout << CLOCKS_PER_SEC*1.0/(clock() - t) << "fps" << endl;
     waitKey(1);
