@@ -10,11 +10,11 @@
 
 #define ShowWindows
 
-//#define SmartCapture
+#define SmartCapture
 
-#define r640x480
+//#define r640x480
 //#define r1280x720
-//#define r1920x1080
+#define r1920x1080
 
 #ifdef r1280x1720
 #define WIDTH 1280
@@ -35,8 +35,7 @@ using namespace gpu;
 
 #ifndef SmartCapture
 VideoCapture capture;
-#endif
-#ifdef SmartCapture
+#else
 GetImage getimg;
 #endif
 
@@ -67,6 +66,17 @@ void setIntrinsic() {
   intrinsic.ptr<float>(2)[0] = 0;
   intrinsic.ptr<float>(2)[1] = 0;
   intrinsic.ptr<float>(2)[2] = 1;
+#elif defined(r1920x1080)
+  //These should be done again
+  intrinsic.ptr<float>(0)[0] = 1223.416576031427;
+  intrinsic.ptr<float>(0)[1] = 0;
+  intrinsic.ptr<float>(0)[2] = 968.8462139173206;
+  intrinsic.ptr<float>(1)[0] = 0;
+  intrinsic.ptr<float>(1)[1] = 1206.547540238048;
+  intrinsic.ptr<float>(1)[2] = 539.136613717971;
+  intrinsic.ptr<float>(2)[0] = 0;
+  intrinsic.ptr<float>(2)[1] = 0;
+  intrinsic.ptr<float>(2)[2] = 1;
 #endif
 }
 
@@ -85,6 +95,13 @@ void setDistCoeffs() {
   distCoeffs.ptr<float>(0)[2] = 0.003811821061129521;
   distCoeffs.ptr<float>(0)[3] = 0.002936280291171185;
   distCoeffs.ptr<float>(0)[4] = 0.1175824546873729;
+#elif defined(r1920x1080)
+  //These should be done again
+  distCoeffs.ptr<float>(0)[0] = -0.2689808925627709;
+  distCoeffs.ptr<float>(0)[1] = 0.2881675340793562;
+  distCoeffs.ptr<float>(0)[2] = -0.01190096876276858;
+  distCoeffs.ptr<float>(0)[3] = -0.02486191381892134;
+  distCoeffs.ptr<float>(0)[4] = -0.1603926525077735;
 #endif
 }
 
@@ -116,15 +133,14 @@ GpuMat getBWImage() {
 
 #ifdef SmartCapture
   img = getimg.mainloop();
-#endif  
-#ifndef SmartCapture
+#else
   capture >> img;
 #endif
   //Undistortion processing
   undistort(img, imgFixed, intrinsic, distCoeffs);
   GpuMat imgFixedGpu(imgFixed);
 #ifdef ShowWindows
-  imshow( "image", imgFixed );
+//  imshow( "image", imgFixed );
 #endif
   //Blur
   gpu::GaussianBlur(imgFixedGpu,blurredImg,Size(kernelSize,kernelSize), 1);
@@ -161,8 +177,7 @@ int main(int argc, char* argv[])
   getimg.open_device();
   getimg.init_device();
   getimg.start_capturing();
-#endif
-#ifndef SmartCapture
+#else
   capture = VideoCapture(0);
 #endif
   //Contours
@@ -173,9 +188,15 @@ int main(int argc, char* argv[])
   const Scalar color = Scalar(255,255,255);
 
   //Angle and distance detection
-  const int z = 4;
+  const int z = -3.25;
   const int h_naught = 12;
+#ifdef r640x480
   const double f = 686;
+#elif defined r1280x720
+  const double f = 1330.5;
+#elif defined r1920x1080
+  const double f = 1330.5;
+#endif
   const int w_naught = 20;
   
 
@@ -221,25 +242,23 @@ int main(int argc, char* argv[])
       if(goodRect.size() > 0) {
         const double alpha = 0.5*(asin(2*z*goodRect[i].height / (f*h_naught)));
         const double d = z/sin(alpha);
-        const double beta = acos(d * goodRect[i].width / (f * w_naught));
-        const double beta_h = asin(sin(beta) / cos(alpha));
+        const double turn = asin((w_naught * ((WIDTH/2) - goodRect[i].x))/(goodRect[i].width * d));
          
         cout << "New image: " << i << endl;
-        cout << "Alpha: \t" << alpha << endl;
-        cout << "d: \t" << d << endl;
-        cout << "beta: \t" << beta << endl;
-        cout << "beta_h: " << beta_h << endl;
-        cout << "height: " << goodRect[i].height << endl;
-        cout << "width: \t" << goodRect[i].width << endl;
+        cout << "\tAlpha: \t" << alpha << endl;
+        cout << "\td: \t" << d << endl;
+        cout << "\tpos turn means we need to turn counter clockwise" << endl;
+        cout << "\tturn: \t" << turn << endl;
+        cout << "\theight: " << goodRect[i].height << endl;
+        cout << "\twidth: \t" << goodRect[i].width << endl;
       }
     }
-    cout << CLOCKS_PER_SEC/(clock() - t) << "fps" << endl;
+    cout << CLOCKS_PER_SEC*1.0/(clock() - t) << "fps" << endl;
     waitKey(1);
   }
 #ifndef SmartCapture
   capture.release();
-#endif
-#ifdef SmartCapture
+#else
   getimg.stop_capturing();
   getimg.uninit_device();
   getimg.close_device();
