@@ -13,22 +13,21 @@
 #define BUFFER 1024
 
 //#define UseUnDistort
-//#define UseThresholding
-//#define UseBlur
-//#define UseDilation
+#define UseThresholding
+
 #define ShowWindows
 
 #ifdef UseThresholding
-//#define UseContours
+#define UseContours
 #endif
 
-//#define SmartCapture
+#define SmartCapture
 
-#define r640x480
-//#define r1280x720
+//#define r640x480
+#define r1280x720
 //#define r1920x1080
 
-#ifdef r1280x1720
+#ifdef r1280x720
 #define WIDTH 1280
 #define HEIGHT 720
 #elif defined(r640x480)
@@ -116,7 +115,7 @@ void setDistCoeffs() {
 }
 
 
-GpuMat getBWImage() {
+Mat getBWImage() {
   clock_t t = clock();
 
   //Dilation
@@ -128,17 +127,16 @@ GpuMat getBWImage() {
 
   //HLS Thresholding
   const int H_low = 60;
-  const int H_high = 180;
+  const int H_high = 90;
   const int S_high = 255;
   const int S_low = 78;
-  const int L_low = 100;
+  const int L_low = 50;
   const int L_high = 255;
   const Scalar low = Scalar(H_low, L_low, S_low);
   const Scalar high = Scalar(H_high, L_high, S_high);
 
   Mat img;
   Mat imgFixed;
-  GpuMat blurredImg;
   Mat imgThresh;
   Mat dilatedImg;
   GpuMat hls;
@@ -158,31 +156,18 @@ GpuMat getBWImage() {
 #else
   GpuMat imgFixedGpu(img);
 #endif
-#ifdef UseBlur
-  //Blur
-  gpu::GaussianBlur(imgFixedGpu,blurredImg,Size(kernelSize,kernelSize), 1);
-#else
-  blurredImg = imgFixedGpu;
-#endif
 #ifdef UseThresholding
   //HLS Threshold processing
-  gpu::cvtColor(blurredImg, hls, COLOR_BGR2HLS);
+  gpu::cvtColor(imgFixedGpu, hls, COLOR_BGR2HLS);
   inRange(Mat(hls), low, high, imgThresh);
-#else
-  imgThresh = Mat(blurredImg);
-#endif
-#ifdef UseDilation
-  //Dilation
-  dilate(imgThresh, dilatedImg,dilateElement); 
-#else
-  dilatedImg = imgThresh;
-#endif
 #ifdef ShowWindows
-  imshow("dilate", dilatedImg);
-#endif 
-  GpuMat returnMat(dilatedImg);
+  imshow( "thresh", imgThresh);
+#endif
+#else
+  imgThresh = Mat(imgFixedGpu);
+#endif
   cout << 1.0*(clock() - t)/CLOCKS_PER_SEC << " for image capture loop" << endl;
-  return returnMat;
+  return imgThresh;
 }
 
 int main(int argc, char* argv[])
@@ -233,7 +218,7 @@ int main(int argc, char* argv[])
   while(1)
   {
     clock_t t = clock();
-    GpuMat dilatedImg = getBWImage();
+    GpuMat dilatedImg(getBWImage());
     //Contours processing
 #ifdef UseThresholding
 #ifdef UseContours

@@ -6,7 +6,7 @@ g++ -ggdb `pkg-config opencv --cflags --libs` -o build/camera GetImage.cpp netwo
 echo "Compiling Camera Calibration Code"
 g++ -ggdb `pkg-config opencv --cflags --libs` camera_calibration.cpp GetImage.cpp -o build/camera_calib `pkg-config --libs opencv`
 echo "Compiling camera test code"
-g++ -ggdb `pkg-config opencv --cflags --libs` -o build/camera_test camera_test.cpp `pkg-config --libs opencv` -Wall
+g++ -ggdb `pkg-config opencv --cflags --libs` -o build/camera_test GetImage.cpp camera_test.cpp `pkg-config --libs opencv` -Wall
 
 if [ $1 = "run" ] ; then
   ./build/camera
