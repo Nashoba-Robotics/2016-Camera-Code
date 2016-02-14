@@ -12,7 +12,15 @@
 // Network buffer size
 #define BUFFER 1024
 
+//#define UseUnDistort
+//#define UseThresholding
+//#define UseBlur
+//#define UseDilation
 #define ShowWindows
+
+#ifdef UseThresholding
+//#define UseContours
+#endif
 
 //#define SmartCapture
 
@@ -109,6 +117,8 @@ void setDistCoeffs() {
 
 
 GpuMat getBWImage() {
+  clock_t t = clock();
+
   //Dilation
   const int dilationSize = 2;
   const Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
@@ -138,23 +148,41 @@ GpuMat getBWImage() {
 #else
   capture >> img;
 #endif
+#ifdef ShowWindows
+  imshow( "image", img);
+#endif
+#ifdef UseUnDistort
   //Undistortion processing
   undistort(img, imgFixed, intrinsic, distCoeffs);
   GpuMat imgFixedGpu(imgFixed);
-#ifdef ShowWindows
-  imshow( "image", imgFixed );
+#else
+  GpuMat imgFixedGpu(img);
 #endif
+#ifdef UseBlur
   //Blur
   gpu::GaussianBlur(imgFixedGpu,blurredImg,Size(kernelSize,kernelSize), 1);
+#else
+  blurredImg = imgFixedGpu;
+#endif
+#ifdef UseThresholding
   //HLS Threshold processing
   gpu::cvtColor(blurredImg, hls, COLOR_BGR2HLS);
   inRange(Mat(hls), low, high, imgThresh);
+#else
+  imgThresh = Mat(blurredImg);
+#endif
+#ifdef UseDilation
   //Dilation
   dilate(imgThresh, dilatedImg,dilateElement); 
+#else
+  dilatedImg = imgThresh;
+#endif
 #ifdef ShowWindows
   imshow("dilate", dilatedImg);
 #endif 
-  return GpuMat(dilatedImg);
+  GpuMat returnMat(dilatedImg);
+  cout << 1.0*(clock() - t)/CLOCKS_PER_SEC << " for image capture loop" << endl;
+  return returnMat;
 }
 
 int main(int argc, char* argv[])
@@ -207,6 +235,8 @@ int main(int argc, char* argv[])
     clock_t t = clock();
     GpuMat dilatedImg = getBWImage();
     //Contours processing
+#ifdef UseThresholding
+#ifdef UseContours
     GpuMat canny_output;
     gpu::Canny(dilatedImg, canny_output, thresh, thresh*2, 3 );
     findContours( Mat(canny_output), contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0) );
@@ -270,6 +300,8 @@ int main(int argc, char* argv[])
         sendMessageRect("10.40.104.84", d, turn);
       } 
     }
+#endif
+#endif
     cout << CLOCKS_PER_SEC*1.0/(clock() - t) << "fps" << endl;
     waitKey(1);
   }
