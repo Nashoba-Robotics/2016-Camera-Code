@@ -15,6 +15,7 @@
 //#define UseUnDistort
 #define UseThresholding
 #define UseDilation
+
 //#define ShowWindows
 
 #ifdef UseThresholding
@@ -23,22 +24,43 @@
 
 #define SmartCapture
 
+#define Rotate
+
 //#define r640x480
 //#define r1280x720
 #define r1920x1080
 
 #ifdef r1280x720
+#ifdef Rotate
+#define WIDTH 720
+#define HEIGHT 1280
+#else
 #define WIDTH 1280
 #define HEIGHT 720
+#endif
 #elif defined(r640x480)
+#ifdef Rotate
+#define WIDTH 480
+#define HEIGHT 640
+#else
 #define WIDTH 640
 #define HEIGHT 480
+#endif
 #elif defined(r1920x1080)
+#ifdef Rotate
+#define WIDTH 1080
+#define HEIGHT 1920
+#else
 #define WIDTH 1920
 #define HEIGHT 1080
 #endif
+#endif
 
+#ifdef Rotate
 #define FOVH 60
+#else
+#define FOVH 92
+#endif
 
 #define HNAUGHT = 12;
 #define WNAUGHT = 20;
@@ -140,7 +162,12 @@ Mat getImage() {
 #else
   capture >> img;
 #endif
-  
+ 
+#ifdef Rotate
+  transpose(img,img);
+  flip(img,img,1);
+#endif
+
   return img;
 }
 
@@ -239,14 +266,12 @@ int main(int argc, char* argv[])
     GpuMat canny_output;
     gpu::Canny(dilatedImg, canny_output, thresh, thresh*2, 3 );
     findContours( Mat(canny_output), contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0) );
-    
     /// Find the convex hull object for each contour
     vector<vector<Point> > hull( contours.size() );
     for(unsigned int i = 0; i < contours.size(); i++ ) {
       convexHull( Mat(contours[i]), hull[i], false );
     }
-  
-    // Approximate the convect hulls with pologons
+    // Approximate the convex hulls with polygons
     // This reduces the number of edges and makes the contours
     // into quads
     vector<vector<Point> > poly( contours.size() );
@@ -255,7 +280,6 @@ int main(int argc, char* argv[])
       // These come out reversed, so reverse back
       reverse(poly[i].begin(), poly[i].end());
     }
-
     // Prune the polygons into only the ones that we are intestered in.
     vector<vector<Point> > prunedPoly(0);
     vector<vector<Point> > prunedHulls(0);
@@ -272,16 +296,14 @@ int main(int argc, char* argv[])
           prunedContours.push_back(contours[i]);
           if(bRect.width * bRect.height > size) {
             size = bRect.width * bRect.height;
-            largest = i;
+            largest = prunedPoly.size() - 1;
           }
         }
       }
       //There are no targest bigger than the minArea
       if(largest == -1)
         continue;
-    
       vector<Point> goodPoly = prunedPoly[largest];
-
 #ifdef ShowWindows
       // Output the final image
       Mat finalImage = img.clone();
@@ -304,19 +326,41 @@ int main(int argc, char* argv[])
       const double y2 = (abs(goodPoly[1].y - goodPoly[2].y) + abs(goodPoly[3].y - goodPoly[0].y))/2;
       const double height = max(y1,y2);
 
+      double leftHeight;
+      double rightHeight;
+      if(height == y1) {
+        if(goodPoly[0].x < goodPoly[2].x) { //0 and 1 are the left two corners
+          leftHeight = abs(goodPoly[0].y - goodPoly[1].y);
+          rightHeight = abs(goodPoly[2].y - goodPoly[3].y);
+        } else { //2 and 3 are the left two corners
+          leftHeight = abs(goodPoly[2].y - goodPoly[3].y);
+          rightHeight = abs(goodPoly[0].y - goodPoly[1].y);
+        }
+      } else {
+        if(goodPoly[0].x < goodPoly[2].x) { //1 and 2 are the left two corners
+          leftHeight = abs(goodPoly[1].y - goodPoly[2].y);
+          rightHeight = abs(goodPoly[0].y - goodPoly[3].y);
+        } else { //3 and 0 are the left two corners
+          leftHeight = abs(goodPoly[0].y - goodPoly[3].y);
+          rightHeight = abs(goodPoly[2].y - goodPoly[1].y);
+        }
+      }
+
       const double xCenterOfTarget = width/2.0 + tlcornerX;
       const double yCenterOfTarget = height/2.0 + tlcornerY;
       const double leftRightPixels = xCenterOfTarget - WIDTH/2.0;
-      const double turn = (FOVH/(1.0 * WIDTH)) * leftRightPixels;
+      const double turn = (FOVH/(1.0 * WIDTH)) * leftRightPixels ;
         
       const double distance = 0;
          
       cout << "New image: " << endl;
+      cout << "\tleftHeight: " << leftHeight << endl;
+      cout << "\trightHeight: " << rightHeight << endl;
       cout << "\txCenter of target: " << xCenterOfTarget << endl;
       cout << "\tyCenter of target: " << yCenterOfTarget << endl;
       cout << "\tleftRightPixels: " << leftRightPixels << endl;
       cout << "\tdistance: \t" << distance << endl;
-      cout << "\tpos turn means we need to turn clockwise" << endl;
+      cout << "\tpos turn means we need to turn counterclockwise" << endl;
       cout << "\tturn: \t" << turn << endl;
       cout << "\theight: " << height << endl;
       cout << "\twidth: \t" << width << endl;
