@@ -33,8 +33,10 @@ int main(int argc, char* argv[])
   getimg.start_capturing();
 #endif
   Mat img;
+  clock_t t;
   while(true)
   {
+   t = clock();
 #ifdef SmartCapture
     img = getimg.mainloop();
 #else
@@ -42,6 +44,8 @@ int main(int argc, char* argv[])
 #endif
     imshow("img", img);
     waitKey(1);
+  
+   fprintf(stderr, "fps: %lf\n",1/((clock() - t)*1.0/CLOCKS_PER_SEC));
   }
 #ifndef SmartCapture
   capture.release();

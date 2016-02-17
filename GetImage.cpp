@@ -35,8 +35,8 @@
 #include "GetImage.h"
 #define CLEAR(x) memset (&(x), 0, sizeof (x))
 
-
-
+using namespace cv;
+using namespace std;
   struct buffer {
           void *                  start;
           size_t                  length;
@@ -46,7 +46,9 @@
     int              fd;
     struct buffer *         buffers;
     unsigned int     n_buffers;
-    IplImage * img;
+   
+    Mat img;
+    Mat cmat;
  
     void errno_exit(const char *s)
     {
@@ -74,9 +76,15 @@
     
     void process_image(const void *p_buf,const int len_buf)
     {
-        CvMat cvmat = cvMat(IMAGE_WIDTH, IMAGE_HEIGHT, CV_8UC3, (void*)p_buf);	
-        img = cvDecodeImage(&cvmat, 1);
-    }
+        
+       cmat = Mat(IMAGE_WIDTH, IMAGE_HEIGHT, CV_8UC3, (void*)p_buf);	
+       img = imdecode(cmat, 1);
+ //      cout << "refcount: " <<((*img.refcount))<<endl; 
+       //cvReleaseMat(img);
+	//cout << "img" << &img 
+       // delete cvmat;
+ //	img = imdecode(p_buf,CV_LOAD_IMAGE_COLOR); 
+   }
 
     int read_frame(int count)   
     {
@@ -109,11 +117,13 @@
           return 1;
         }
     
-    IplImage * GetImage ::  mainloop(void)
+    Mat  GetImage ::  mainloop(void)
     {
         unsigned int count;
         count = COUNT_IGNORE;
-        while(count-- > 0)
+        
+//	img.release();
+	while(count-- > 0)
         {
         //fprintf(stderr, "%d count\n",count);
               for(;;)
@@ -137,7 +147,7 @@
                 {
                   fprintf(stderr, "select timeout\n");
                   //exit(EXIT_FAILURE);
-                  return NULL;
+                  return Mat();
                 }
               if(read_frame(count))
                 break;
