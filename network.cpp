@@ -14,8 +14,7 @@
 
 // Print out information about the target to the console
 // Send a message about the target to the roborio
-int sendMessageRect(const char *ipAddr, float distance, float angle) {
-  char sendbuffer[BUFFERSIZE];
+int sendMessage(const char *ipAddr, char* sendbuffer) {
   struct sockaddr_in addr;
   int sd;
   
@@ -29,9 +28,13 @@ int sendMessageRect(const char *ipAddr, float distance, float angle) {
     perror(ipAddr);
     return -1;
   }
-  sprintf(sendbuffer, "%f:%f", distance, angle);
-  std::cout << distance << ":" << angle << std::endl;
   sendto(sd, sendbuffer, strlen(sendbuffer)+1, 0, (struct sockaddr*)&addr, sizeof(addr));
   close(sd);
   return 0;
+}
+
+int sendMessageRect(const char *ipAddr, float distance, float angle) {
+  char sendbuffer[BUFFERSIZE];
+  sprintf(sendbuffer, "%f:%f", distance, angle);
+  return sendMessage(ipAddr, sendbuffer);
 }

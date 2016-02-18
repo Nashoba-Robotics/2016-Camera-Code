@@ -26,6 +26,8 @@
 
 #define Rotate
 
+#define Log
+
 //#define r640x480
 //#define r1280x720
 #define r1920x1080
@@ -75,8 +77,10 @@ VideoCapture capture;
 GetImage getimg;
 #endif
 
+#ifdef UseUnDistort
 Mat intrinsic;
 Mat distCoeffs;
+#endif
 
 static const cv::Scalar ColorWhite   = cv::Scalar( 255, 255, 255 );
 static const cv::Scalar ColorPurple  = cv::Scalar( 255, 0, 255 );
@@ -86,6 +90,7 @@ static const cv::Scalar ColorGreen   = cv::Scalar( 0, 255, 0 );
 static const cv::Scalar ColorRed     = cv::Scalar( 0, 0, 255 );
 static const cv::Scalar ColorYellow  = cv::Scalar( 0, 255, 255 );
 
+#ifdef UseUnDistort
 void setIntrinsic() {
   //Undistortion constants
   intrinsic = Mat(3,3,CV_32FC1);
@@ -148,6 +153,7 @@ void setDistCoeffs() {
   distCoeffs.ptr<float>(0)[4] = -0.1603926525077735;
 #endif
 }
+#endif
 
 Mat getImage() {
   Mat img;
@@ -174,8 +180,6 @@ Mat getImage() {
 
 
 Mat getBWImage(Mat img) {
-  clock_t t = clock();
-
 #ifdef UseDilation
   //Dilation
   const int dilationSize = 2;
@@ -219,26 +223,31 @@ Mat getBWImage(Mat img) {
 #ifdef ShowWindows
   imshow("dilate", dilatedImg);
 #endif
-  cout << 1.0*(clock() - t)/CLOCKS_PER_SEC << " for image capture loop" << endl;
   return dilatedImg;
 }
 
 int main(int argc, char* argv[])
 {
+#ifdef Log
   cout << "Using OpenCV Version " << CV_MAJOR_VERSION << "." << CV_MINOR_VERSION << endl;
-
+#endif
   int numGPU = getCudaEnabledDeviceCount();
+#ifdef Log
   cout << "Number of GPU Devices: " << numGPU << endl;
-  
+#endif
   if(numGPU == 0) {
+#ifdef Log
     cout << "Need to have a GPU Device" << endl;
+#endif
     return 1;
   }
   
   setDevice(0);
 
+#ifdef UseUnDistort
   setDistCoeffs();
   setIntrinsic();
+#endif
 
 #ifdef SmartCapture
   getimg = GetImage();
@@ -257,9 +266,11 @@ int main(int argc, char* argv[])
   
   while(1)
   {
+#ifdef Log
     clock_t t = clock();
-    Mat img(getImage());
-    GpuMat dilatedImg(getBWImage(img));
+#endif
+    Mat img = getImage();
+    GpuMat dilatedImg = GpuMat(getBWImage(img));
     //Contours processing
 #ifdef UseThresholding
 #ifdef UseContours
@@ -286,6 +297,7 @@ int main(int argc, char* argv[])
     vector<vector<Point> > prunedContours(0);
     if (poly.size() > 0) {
       int size = minArea;
+      int largestPos = WIDTH;
       int largest = -1;
       for (unsigned int i=0; i < poly.size(); i++) {
         Rect bRect = boundingRect(poly[i]);
@@ -294,15 +306,16 @@ int main(int argc, char* argv[])
           prunedPoly.push_back(poly[i]);
           prunedHulls.push_back(hull[i]);
           prunedContours.push_back(contours[i]);
-          if(bRect.width * bRect.height > size) {
+          if(bRect.width * bRect.height > size-200 && bRect.width/2 + bRect.x < largestPos ) {
             size = bRect.width * bRect.height;
             largest = prunedPoly.size() - 1;
+            largestPos = bRect.width/2 + bRect.x;
           }
         }
       }
       //There are no targest bigger than the minArea
       if(largest == -1)
-        continue;
+        goto FPS;
       vector<Point> goodPoly = prunedPoly[largest];
 #ifdef ShowWindows
       // Output the final image
@@ -346,13 +359,20 @@ int main(int argc, char* argv[])
         }
       }
 
+      if(leftHeight > 200 || rightHeight > 200) {
+        goto FPS;
+      }
+
       const double xCenterOfTarget = width/2.0 + tlcornerX;
       const double yCenterOfTarget = height/2.0 + tlcornerY;
       const double leftRightPixels = xCenterOfTarget - WIDTH/2.0;
       const double turn = (FOVH/(1.0 * WIDTH)) * leftRightPixels ;
         
-      const double distance = 0;
-         
+      const double distance = (height-128)/(-3.7);
+      if(distance < 0 || distance > 25 || abs(turn) > 40) {
+        goto FPS;
+      }
+#ifdef Log   
       cout << "New image: " << endl;
       cout << "\tleftHeight: " << leftHeight << endl;
       cout << "\trightHeight: " << rightHeight << endl;
@@ -366,12 +386,18 @@ int main(int argc, char* argv[])
       cout << "\twidth: \t" << width << endl;
       cout << "\tx: \t" << tlcornerX << endl;
       cout << "\ty: \t" << tlcornerY << endl;
-
-      sendMessageRect("10.17.68.21", distance, turn); 
+#endif
+      sendMessageRect("10.17.68.33", distance, turn); 
     }
 #endif
 #endif
-    cout << CLOCKS_PER_SEC*1.0/(clock() - t) << "fps" << endl;
+    FPS:
+#ifdef Log
+    char fps[1024];
+    sprintf(fps, "%f fps", CLOCKS_PER_SEC*1.0/(clock() - t));
+    cout << fps << endl;
+    sendMessage("10.17.68.33", fps);
+#endif
     waitKey(1);
   }
 #ifndef SmartCapture

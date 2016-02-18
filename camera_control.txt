@@ -1,0 +1,10 @@
+Change camera settings with v4l2-ctl
+
+Set exposure to 20:
+v4l2-ctl -c exposure_absolute=20
+
+Get exposure value:
+v4l2-tctl -C exposure_absolute
+
+List full settings:
+v4l2-ctl --all
