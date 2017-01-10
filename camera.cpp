@@ -9,9 +9,12 @@
 
 #define ShowWindows
 
-//#define r640x480
-#define r1280x720
+#define r640x480
+//#define r1280x720
 //#define r1920x1080
+
+//#define Undistort
+//#define Blur
 
 #ifdef r1280x1720
 #define WIDTH 1280
@@ -57,14 +60,25 @@ Mat getBWImage( Mat intrinsic, Mat distCoeffs) {
   Mat hls;
   
   capture >> img;
-  imshow("image1", img);
+
   //Undistortion processing
+#ifdef Undistort
   undistort(img, imgFixed, intrinsic, distCoeffs);
+#else
+  imgFixed = img;
+#endif
+
 #ifdef ShowWindows
   imshow( "image", imgFixed );
 #endif
+
   //Blur
+#ifdef Blur
   GaussianBlur(imgFixed,blurredImg,Size(kernelSize,kernelSize), 1);
+#else
+  blurredImg = imgFixed;
+#endif
+
   //HLS Threshold processing
   cvtColor(blurredImg, hls, COLOR_BGR2HLS);
   inRange(hls, low, high, imgThresh);
