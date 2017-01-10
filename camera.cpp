@@ -29,7 +29,7 @@
 using namespace cv;
 using namespace std;
 
-GetImage getimg;
+VideoCapture capture;
 
 Mat getBWImage( Mat intrinsic, Mat distCoeffs) {
   //Dilation
@@ -56,8 +56,8 @@ Mat getBWImage( Mat intrinsic, Mat distCoeffs) {
   Mat dilatedImg;
   Mat hls;
   
-	//cap >> img;
-  img = getimg.mainloop();
+  capture >> img;
+  imshow("image1", img);
   //Undistortion processing
   undistort(img, imgFixed, intrinsic, distCoeffs);
 #ifdef ShowWindows
@@ -128,19 +128,12 @@ Mat getDistCoeffs() {
 int main(int argc, char* argv[])
 {
   cout << "Using OpenCV Version " << CV_MAJOR_VERSION << "." << CV_MINOR_VERSION << endl;
-/* 
- VideoCapture capture = VideoCapture(0);  
+  capture = VideoCapture(0);  
   if(!capture.isOpened()) {
     cout << "Video Capture not opened" << endl;
     return -1;
   } 
- */
 
-  getimg = GetImage();
-  getimg.open_device();
-  getimg.init_device();
-  getimg.start_capturing();
- 
   //Contours
   const int minArea = 2000;
   const int thresh = 200; //For edge detection 
@@ -213,9 +206,6 @@ int main(int argc, char* argv[])
     cout << CLOCKS_PER_SEC/(clock() - t) << "fps" << endl;
     waitKey(1);
   }
-  //capture.release();
-  getimg.stop_capturing();
-  getimg.uninit_device();
-  getimg.close_device();
+  capture.release();
   return 0;
 }
