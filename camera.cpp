@@ -6,6 +6,8 @@
 #include "opencv2/highgui/highgui_c.h"
 #include <math.h>
 #include "GetImage.h"
+#include <errno.h>
+#include <wiringPiSPI.h>
 
 //#define ShowWindows
 
@@ -26,7 +28,16 @@
 #define HEIGHT 1080
 #endif
 
-//g++ -ggdb `pkg-config opencv --cflags --libs` camera.cpp -o camera `pkg-config --libs opencv`
+#define USE_SPI
+#define SPI_CHANNEL 0
+#define SPI_SPEED 500000
+
+#define HUE_LOW 60
+#define HUE_HIGH 180
+#define LUM_LOW 100
+#define LUM_HIGH 255
+#define SAT_LOW 28
+#define SAT_HIGH 255
 
 using namespace cv;
 using namespace std;
@@ -44,14 +55,8 @@ Mat getBWImage() {
 #endif
 
   //HLS Thresholding
-  const int H_low = 60;
-  const int H_high = 180;
-  const int S_high = 255;
-  const int S_low = 78;
-  const int L_low = 100;
-  const int L_high = 255;
-  const Scalar low = Scalar(H_low, L_low, S_low);
-  const Scalar high = Scalar(H_high, L_high, S_high);
+  const Scalar low = Scalar(HUE_LOW, LUM_LOW, SAT_LOW);
+  const Scalar high = Scalar(HUE_HIGH, LUM_HIGH, SAT_HIGH);
 
   Mat img;
   Mat imgFixed;
@@ -88,6 +93,17 @@ int main(int argc, char* argv[])
 {
   setNumThreads(4);
 
+#ifdef USE_SPI
+  cout << "Initializing wiringPi" << endl;
+
+  int spiID = wiringPiSPISetup(SPI_CHANNEL, SPI_SPEED);
+
+  if(spiID == -1) {
+    int err = errno;
+    cout << "WiringPi SPI initialization failed: " << strerror(err) << endl;
+  }
+#endif
+
   cout << "Using OpenCV Version " << CV_MAJOR_VERSION << "." << CV_MINOR_VERSION << endl;
   capture = VideoCapture(0);  
   if(!capture.isOpened()) {
@@ -102,13 +118,6 @@ int main(int argc, char* argv[])
   vector<vector<Point> > contours;
   vector<Vec4i> hierarchy;
   const Scalar color = Scalar(255,255,255);
-
-  //Angle and distance detection
-  const int z = 4;
-  const int h_naught = 12;
-  const double f = 686;
-  const int w_naught = 20;
-  
 
   while(1)
   {
@@ -127,8 +136,6 @@ int main(int argc, char* argv[])
       approxPolyDP(Mat(contours[i]), contours_poly[i], 3, true);
       boundRect.push_back(boundingRect(Mat(contours_poly[i])));
       if(boundRect[i].width * boundRect[i].height > minArea){
-        cout << "Adding one to good rect" << endl;
-        cout << "\t Width : " << boundRect[i].width << endl;
         goodContours.push_back(contours[i]);
         goodRect.push_back(boundRect[i]);
       }
@@ -143,24 +150,37 @@ int main(int argc, char* argv[])
 #ifdef ShowWindows
     imshow("Contours", drawing);
 #endif
-    cout << "Good Rect size: " << goodRect.size() << endl; 
     //Determine which contour to use.
     //We'll assume there's only one contour for now, but this needs to be fixed.
     for(unsigned int i = 0; i < goodRect.size(); i++)
     {
       if(goodRect.size() > 0) {
-        const double alpha = 0.5*(asin(2*z*goodRect[i].height / (f*h_naught)));
-        const double d = z/sin(alpha);
-        const double beta = acos(d * goodRect[i].width / (f * w_naught));
-        const double beta_h = asin(sin(beta) / cos(alpha));
-         
         cout << "New image: " << i << endl;
-        cout << "Alpha: \t" << alpha << endl;
-        cout << "d: \t" << d << endl;
-        cout << "beta: \t" << beta << endl;
-        cout << "beta_h: " << beta_h << endl;
         cout << "height: " << goodRect[i].height << endl;
         cout << "width: \t" << goodRect[i].width << endl;
+
+        //TODO: These are placeholder variables for testing.
+        //      We need to find the actual distance and angle here.
+        //      These are in units of 16ths of an inch and hundreths of degrees 
+        int distance = goodRect[i].height;
+        int angleToTurn = goodRect[i].width;
+
+        cout << "Distance: \t" << distance << endl;
+        cout << "Angle: \t\t" << angleToTurn << endl;
+
+#ifdef USE_SPI
+        unsigned char data[8] = {0};
+        data[0] = distance;
+        data[4] = angleToTurn;
+
+        int result = wiringPiSPIDataRW(SPI_CHANNEL, data, 8);
+        
+        if(result < 0) {
+          int err = errno;
+          cout << "SPI had an error: " << strerror(err) << endl;
+        }
+#endif
+
       }
     }
     cout << CLOCKS_PER_SEC/(clock() - t) << "fps" << endl;
