@@ -7,13 +7,12 @@
 #include <math.h>
 #include "GetImage.h"
 
-#define ShowWindows
+//#define ShowWindows
 
 #define r640x480
 //#define r1280x720
 //#define r1920x1080
 
-//#define Undistort
 //#define Blur
 
 #ifdef r1280x1720
@@ -34,13 +33,15 @@ using namespace std;
 
 VideoCapture capture;
 
-Mat getBWImage( Mat intrinsic, Mat distCoeffs) {
+Mat getBWImage() {
   //Dilation
   const int dilationSize = 2;
   const Mat dilateElement = getStructuringElement(MORPH_RECT, Size(2*dilationSize + 1, 2*dilationSize + 1), Point(dilationSize, dilationSize));
 
+#ifdef Blur
   //Blur
   const int kernelSize = 8*1+ 1;
+#endif
 
   //HLS Thresholding
   const int H_low = 60;
@@ -61,22 +62,15 @@ Mat getBWImage( Mat intrinsic, Mat distCoeffs) {
   
   capture >> img;
 
-  //Undistortion processing
-#ifdef Undistort
-  undistort(img, imgFixed, intrinsic, distCoeffs);
-#else
-  imgFixed = img;
-#endif
-
 #ifdef ShowWindows
-  imshow( "image", imgFixed );
+  imshow( "image", img);
 #endif
 
   //Blur
 #ifdef Blur
-  GaussianBlur(imgFixed,blurredImg,Size(kernelSize,kernelSize), 1);
+  GaussianBlur(img,blurredImg,Size(kernelSize,kernelSize), 1);
 #else
-  blurredImg = imgFixed;
+  blurredImg = img;
 #endif
 
   //HLS Threshold processing
@@ -90,57 +84,10 @@ Mat getBWImage( Mat intrinsic, Mat distCoeffs) {
  return dilatedImg;
 }
 
-Mat getIntrinsic() {
-  //Undistortion constants
-  Mat intrinsic = Mat(3,3,CV_32FC1);
-#ifdef r640x480
-  intrinsic.ptr<float>(0)[0] = 567.3694188707971;
-  intrinsic.ptr<float>(0)[1] = 0;
-  intrinsic.ptr<float>(0)[2] = 334.050726216;
-  intrinsic.ptr<float>(1)[0] = 0;
-  intrinsic.ptr<float>(1)[1] = 566.853963425446;
-  intrinsic.ptr<float>(1)[2] = 236.5266640528402;
-  intrinsic.ptr<float>(2)[0] = 0;
-  intrinsic.ptr<float>(2)[1] = 0;
-  intrinsic.ptr<float>(2)[2] = 1;
-#elif defined(r1280x720)
-  //These should be done again
-  intrinsic.ptr<float>(0)[0] = 849.256399173029;
-  intrinsic.ptr<float>(0)[1] = 0;
-  intrinsic.ptr<float>(0)[2] = 655.2627383935369;
-  intrinsic.ptr<float>(1)[0] = 0;
-  intrinsic.ptr<float>(1)[1] = 850.2670498542308;
-  intrinsic.ptr<float>(1)[2] = 361.233269254571;
-  intrinsic.ptr<float>(2)[0] = 0;
-  intrinsic.ptr<float>(2)[1] = 0;
-  intrinsic.ptr<float>(2)[2] = 1;
-#endif
-
-  return intrinsic;
-}
-
-Mat getDistCoeffs() {
-  Mat distCoeffs = Mat(1,5,CV_32FC1);
-#ifdef r640x480
-  distCoeffs.ptr<float>(0)[0] = -0.463731090351821;
-  distCoeffs.ptr<float>(0)[1] = 0.5114874359918231;
-  distCoeffs.ptr<float>(0)[2] = -0.003444501644466447;
-  distCoeffs.ptr<float>(0)[3] = 0.0005056629007096351;
-  distCoeffs.ptr<float>(0)[4] = -0.6914960232636986;
-#elif defined(r1280x720)
-  //These should be done again
-  distCoeffs.ptr<float>(0)[0] = -0.1019179702473763;
-  distCoeffs.ptr<float>(0)[1] = -0.09943304239604193;
-  distCoeffs.ptr<float>(0)[2] = 0.003811821061129521;
-  distCoeffs.ptr<float>(0)[3] = 0.002936280291171185;
-  distCoeffs.ptr<float>(0)[4] = 0.1175824546873729;
-#endif
-
-  return distCoeffs;
-}
-
 int main(int argc, char* argv[])
 {
+  setNumThreads(4);
+
   cout << "Using OpenCV Version " << CV_MAJOR_VERSION << "." << CV_MINOR_VERSION << endl;
   capture = VideoCapture(0);  
   if(!capture.isOpened()) {
@@ -166,10 +113,9 @@ int main(int argc, char* argv[])
   while(1)
   {
     clock_t t = clock();
-    Mat dilatedImg;
-    dilatedImg = getBWImage( getIntrinsic(), getDistCoeffs());
+    Mat img = getBWImage();
     //Contours processing
-    Canny(dilatedImg, canny_output, thresh, thresh*2, 3 );
+    Canny(img, canny_output, thresh, thresh*2, 3 );
     findContours( canny_output, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0,0) );
     //Limit contours (area, perimeter, etc.)
     vector<vector<Point> > goodContours(0);
@@ -218,7 +164,7 @@ int main(int argc, char* argv[])
       }
     }
     cout << CLOCKS_PER_SEC/(clock() - t) << "fps" << endl;
-    waitKey(1);
+    //waitKey(1);
   }
   capture.release();
   return 0;
