@@ -91,7 +91,7 @@ Mat getBWImage() {
 
 int main(int argc, char* argv[])
 {
-  setNumThreads(4);
+  setNumThreads(0);
 
 #ifdef USE_SPI
   cout << "Initializing wiringPi" << endl;

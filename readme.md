@@ -10,3 +10,13 @@ camera_calibration.cpp uses a chessboard pattern to find a calibration matrix th
 install opencv 2.4.* and wiringPi
 
 Run ./compile.sh
+
+**Overclocking Raspberry Pi**
+In /boot/config.txt, add the lines
+
+arm_freq=1400
+over_voltage=5
+adram_freq=500
+
+arm_freq refers to the MHz of the cpu, the other settings allow it to interface with the rest of the Pi successfully.
+
