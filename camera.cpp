@@ -7,6 +7,15 @@
 #include <math.h>
 #include "GetImage.h"
 #include <errno.h>
+#include "tcp_client.h"
+
+#define USE_NETWORK
+#ifdef USE_NETWORK
+
+#define PORT 5800
+#define ROBOT_IP "roboRIO-1768-FRC.local"
+
+#endif
 
 //#define ShowWindows
 
@@ -30,7 +39,7 @@
 
 //#define USE_HLS
 #ifdef USE_HLS
-#define HUE_LOW 60
+#define HUE_LOW 60 
 #define HUE_HIGH 180
 #define LUM_LOW 100
 #define LUM_HIGH 255
@@ -122,7 +131,13 @@ int main(int argc, char* argv[])
   if(!capture.isOpened()) {
     cout << "Video Capture not opened" << endl;
     return -1;
-  } 
+  }
+
+#ifdef USE_NETWORK 
+  tcp_client c;
+  string host = ROBOT_IP; 
+  c.conn(host, PORT);
+#endif
 
   //Contours
   const int minArea = 2000;
@@ -180,6 +195,12 @@ int main(int argc, char* argv[])
 
         cout << "Distance: \t" << distance << endl;
         cout << "Angle: \t\t" << angleToTurn << endl;
+#ifdef USE_NETWORK
+        c.send_actual_data('d', distance);
+        c.send_actual_data('a', angleToTurn);
+#endif 
+
+
 
       }
     }
