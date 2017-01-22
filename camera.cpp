@@ -7,7 +7,6 @@
 #include <math.h>
 #include "GetImage.h"
 #include <errno.h>
-#include <wiringPiSPI.h>
 
 //#define ShowWindows
 
@@ -16,6 +15,7 @@
 //#define r1920x1080
 
 //#define Blur
+#define Dilate
 
 #ifdef r1280x1720
 #define WIDTH 1280
@@ -28,16 +28,24 @@
 #define HEIGHT 1080
 #endif
 
-#define USE_SPI
-#define SPI_CHANNEL 0
-#define SPI_SPEED 500000
-
+//#define USE_HLS
+#ifdef USE_HLS
 #define HUE_LOW 60
 #define HUE_HIGH 180
 #define LUM_LOW 100
 #define LUM_HIGH 255
 #define SAT_LOW 28
 #define SAT_HIGH 255
+#else
+#define RED_LOW 0
+#define RED_HIGH 77
+#define GREEN_LOW 135
+#define GREEN_HIGH 255
+#define BLUE_LOW 0
+#define BLUE_HIGH 255
+#endif
+
+
 
 using namespace cv;
 using namespace std;
@@ -54,9 +62,16 @@ Mat getBWImage() {
   const int kernelSize = 8*1+ 1;
 #endif
 
+#ifdef USE_HLS
   //HLS Thresholding
   const Scalar low = Scalar(HUE_LOW, LUM_LOW, SAT_LOW);
   const Scalar high = Scalar(HUE_HIGH, LUM_HIGH, SAT_HIGH);
+#else
+  //RGB Thresholding
+  const Scalar low = Scalar(RED_LOW, GREEN_LOW, BLUE_LOW);
+  const Scalar high = Scalar(RED_HIGH, GREEN_HIGH, BLUE_HIGH);
+#endif
+
 
   Mat img;
   Mat imgFixed;
@@ -78,11 +93,20 @@ Mat getBWImage() {
   blurredImg = img;
 #endif
 
+#ifdef USE_HLS
   //HLS Threshold processing
   cvtColor(blurredImg, hls, COLOR_BGR2HLS);
   inRange(hls, low, high, imgThresh);
+#else
+  inRange(blurredImg, low, high, imgThresh);
+#endif
+
+#ifdef Dilate
   //Dilation
   dilate(imgThresh, dilatedImg,dilateElement); 
+#else
+  dilatedImg = imgThresh;
+#endif
 #ifdef ShowWindows
   imshow("dilate", dilatedImg);
 #endif 
@@ -92,17 +116,6 @@ Mat getBWImage() {
 int main(int argc, char* argv[])
 {
   setNumThreads(0);
-
-#ifdef USE_SPI
-  cout << "Initializing wiringPi" << endl;
-
-  int spiID = wiringPiSPISetup(SPI_CHANNEL, SPI_SPEED);
-
-  if(spiID == -1) {
-    int err = errno;
-    cout << "WiringPi SPI initialization failed: " << strerror(err) << endl;
-  }
-#endif
 
   cout << "Using OpenCV Version " << CV_MAJOR_VERSION << "." << CV_MINOR_VERSION << endl;
   capture = VideoCapture(0);  
@@ -167,19 +180,6 @@ int main(int argc, char* argv[])
 
         cout << "Distance: \t" << distance << endl;
         cout << "Angle: \t\t" << angleToTurn << endl;
-
-#ifdef USE_SPI
-        unsigned char data[8] = {0};
-        data[0] = distance;
-        data[4] = angleToTurn;
-
-        int result = wiringPiSPIDataRW(SPI_CHANNEL, data, 8);
-        
-        if(result < 0) {
-          int err = errno;
-          cout << "SPI had an error: " << strerror(err) << endl;
-        }
-#endif
 
       }
     }
