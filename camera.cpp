@@ -11,10 +11,13 @@
 #define USE_NETWORK
 #ifdef USE_NETWORK
 #include "tcp_client.h"
-
 #define PORT 5800
 #define ROBOT_IP "roboRIO-1768-FRC.local"
+#endif
 
+#define USE_RASPICAM
+#ifdef USE_RASPICAM
+#include <raspicam/raspicam_cv.h>
 #endif
 
 //#define ShowWindows
@@ -59,7 +62,11 @@
 using namespace cv;
 using namespace std;
 
+#ifdef USE_RASPICAM
+raspicam::RaspiCam_Cv capture;
+#else
 VideoCapture capture;
+#endif
 
 Mat getBWImage() {
   //Dilation
@@ -89,7 +96,12 @@ Mat getBWImage() {
   Mat dilatedImg;
   Mat hls;
   
+#ifdef USE_RASPICAM
+  capture.grab();
+  capture.retrieve(img);
+#else
   capture >> img;
+#endif
 
 #ifdef ShowWindows
   imshow( "image", img);
@@ -127,18 +139,29 @@ int main(int argc, char* argv[])
   setNumThreads(0);
 
   cout << "Using OpenCV Version " << CV_MAJOR_VERSION << "." << CV_MINOR_VERSION << endl;
+
+#ifdef USE_RASPICAM
+  cout << "Opening Raspberry Pi Camera" << endl;
+  capture.set(CV_CAP_PROP_FORMAT, CV_8UC1);
+  if(!capture.open()) {
+      cout << "Raspberry Pi Camera not opened" << endl;
+      return -1;
+  }
+#else
+  cout << "Opening USB Camera" << endl;
   capture = VideoCapture(0);  
   if(!capture.isOpened()) {
     cout << "Video Capture not opened" << endl;
     return -1;
   }
+#endif
 
 #ifdef USE_NETWORK 
   tcp_client c;
   string host = ROBOT_IP; 
-  while( !c.conn(host, PORT)) {
-      cout << "Trying to connect..." << endl;
-  }
+  do {
+    cout << "Trying to connect..." << endl;
+  } while( !c.conn(host, PORT));
 #endif
 
   //Contours

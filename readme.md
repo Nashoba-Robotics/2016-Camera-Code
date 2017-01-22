@@ -7,7 +7,7 @@ It uses OpenCV to identify the target.
 camera_calibration.cpp uses a chessboard pattern to find a calibration matrix that is used to calibrate the camera.
 
 **Compilation**
-install opencv 2.4.* and wiringPi
+install opencv 2.4.* and raspicam (www.uco.es/investiga/grupos/ava/node/40 
 
 Run ./compile.sh
 
