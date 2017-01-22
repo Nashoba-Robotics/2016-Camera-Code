@@ -7,10 +7,10 @@
 #include <math.h>
 #include "GetImage.h"
 #include <errno.h>
-#include "tcp_client.h"
 
 #define USE_NETWORK
 #ifdef USE_NETWORK
+#include "tcp_client.h"
 
 #define PORT 5800
 #define ROBOT_IP "roboRIO-1768-FRC.local"
@@ -136,7 +136,9 @@ int main(int argc, char* argv[])
 #ifdef USE_NETWORK 
   tcp_client c;
   string host = ROBOT_IP; 
-  c.conn(host, PORT);
+  while( !c.conn(host, PORT)) {
+      cout << "Trying to connect..." << endl;
+  }
 #endif
 
   //Contours

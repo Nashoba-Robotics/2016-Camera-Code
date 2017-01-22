@@ -52,7 +52,7 @@ bool tcp_client::conn(string address , int port)
 		{
 			//gethostbyname failed
 			herror("gethostbyname");
-			cout<<"Failed to resolve hostname\n";
+			cout<<"Failed to resolve hostname " << address.c_str() << endl;
 			
 			return false;
 		}
@@ -84,7 +84,7 @@ bool tcp_client::conn(string address , int port)
 	if (connect(sock , (struct sockaddr *)&server , sizeof(server)) < 0)
 	{
 		perror("connect failed. Error");
-		return 1;
+		return false;
 	}
 	
 	cout<<"Connected\n";
