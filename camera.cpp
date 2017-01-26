@@ -15,7 +15,7 @@
 #define ROBOT_IP "roboRIO-1768-FRC.local"
 #endif
 
-#define USE_RASPICAM
+//#define USE_RASPICAM
 #ifdef USE_RASPICAM
 #include <raspicam/raspicam_cv.h>
 #endif
