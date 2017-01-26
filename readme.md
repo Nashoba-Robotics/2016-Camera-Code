@@ -1,15 +1,24 @@
 The code for the 2016 robot.
 
-It runs on a Jetson TK1.
+It runs on a Jetson TK1 or Raspberry Pi.
 
 It uses OpenCV to identify the target.
 
-camera_calibration.cpp uses a chessboard pattern to find a calibration matrix that is used to calibrate the camera.
-
 **Compilation**
-install opencv 2.4.* and raspicam (www.uco.es/investiga/grupos/ava/node/40 
+Install opencv 2.4.x 
+Install raspicam (www.uco.es/investiga/grupos/ava/node/40) and enable USE_RASPICAM in camera.cpp if you want to use the raspicam 
 
-Run ./compile.sh
+Run `make camera` to compile.
+
+**Running**
+
+Run `make run` or `./build/camera`.
+
+**Clean up build**
+
+Run `make clean`
+
+This shouldn't ever need to be done. 
 
 **Overclocking Raspberry Pi**
 In /boot/config.txt, add the lines
