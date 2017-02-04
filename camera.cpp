@@ -12,7 +12,8 @@
 #ifdef USE_NETWORK
 #include "tcp_client.h"
 #define PORT 5800
-#define ROBOT_IP "roboRIO-1768-FRC.local"
+//#define ROBOT_IP "roboRIO-1768-FRC.local"
+#define ROBOT_IP "10.17.68.22"
 #endif
 
 //#define USE_RASPICAM
@@ -26,7 +27,7 @@
 //#define r1280x720
 //#define r1920x1080
 
-//#define Blur
+#define Blur
 #define Dilate
 
 #ifdef r1280x1720
@@ -50,11 +51,11 @@
 #define SAT_HIGH 255
 #else
 #define RED_LOW 0
-#define RED_HIGH 77
-#define GREEN_LOW 135
+#define RED_HIGH 10
+#define GREEN_LOW 250 
 #define GREEN_HIGH 255
 #define BLUE_LOW 0
-#define BLUE_HIGH 255
+#define BLUE_HIGH 10
 #endif
 
 
@@ -216,7 +217,7 @@ int main(int argc, char* argv[])
         //      We need to find the actual distance and angle here.
         //      These are in units of 16ths of an inch and hundreths of degrees 
         int distance = goodRect[i].height;
-        int angleToTurn = goodRect[i].width;
+        int angleToTurn = (goodRect[i].x + goodRect[i].width/2) - WIDTH/2;
 
         cout << "Distance: \t" << distance << endl;
         cout << "Angle: \t\t" << angleToTurn << endl;
